@@ -38,6 +38,9 @@
 
 	/** @type {Object} */
 	$.pkp.plugins.generic = $.pkp.plugins.generic || {};
+	
+	/** @type {Object} */
+	$.pkp.plugins.pubIds = $.pkp.plugins.pubIds || {};
 
 
 
