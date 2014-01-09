@@ -120,6 +120,7 @@ class AuthorForm extends Form {
 				'primaryContact' => $author->getPrimaryContact()
 			);
 		}
+		return parent::initData();
 	}
 
 	/**

@@ -63,6 +63,8 @@
 		<input type="hidden" name="rowId" value="{$rowId|escape}" />
 	{/if}
 
+	{call_hook name="Templates::Controllers::Grid::Users::Author::Form::AuthorForm::AdditionalMetadata"}
+
 	{fbvFormButtons id="step2Buttons" submitText="common.save"}
 </form>
 <p><span class="formRequired">{translate key="common.requiredField"}</span></p>
