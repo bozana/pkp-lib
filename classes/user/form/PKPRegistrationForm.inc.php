@@ -66,7 +66,7 @@ class PKPRegistrationForm extends Form {
 				$this->addCheck(new FormValidatorEmail($this, 'email', 'required', 'user.profile.form.emailRequired'));
 				$this->addCheck(new FormValidatorCustom($this, 'email', 'required', 'user.register.form.emailsDoNotMatch', create_function('$email,$form', 'return $email == $form->getData(\'confirmEmail\');'), array(&$this)));
 				$this->addCheck(new FormValidatorCustom($this, 'email', 'required', 'user.register.form.emailExists', array(DAORegistry::getDAO('UserDAO'), 'userExistsByEmail'), array(), true));
-				$this->addCheck(new FormValidator($this, 'country', 'required', 'user.profile.form.countryRequired'));
+				//$this->addCheck(new FormValidator($this, 'country', 'required', 'user.profile.form.countryRequired'));
 				if ($this->captchaEnabled) {
 					$this->addCheck(new FormValidatorReCaptcha($this, 'recaptcha_challenge_field', 'recaptcha_response_field', Request::getRemoteAddr(), 'common.captchaField.badCaptcha'));
 				}
