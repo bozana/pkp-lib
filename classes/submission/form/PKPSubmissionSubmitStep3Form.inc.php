@@ -76,7 +76,7 @@ class PKPSubmissionSubmitStep3Form extends SubmissionSubmitForm {
 			$submission->stampStatusModified();
 			$submission->setSubmissionProgress(0);
 		}
-
+		parent::execute($submission);
 		// Save the submission.
 		$submissionDao->updateObject($submission);
 
