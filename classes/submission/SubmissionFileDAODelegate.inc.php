@@ -294,6 +294,17 @@ class SubmissionFileDAODelegate extends DAO {
 	}
 
 	/**
+	 * Get a list of additional fields that do not have
+	 * dedicated accessors.
+	 * @return array
+	 */
+	function getAdditionalFieldNames() {
+		$additionalFields = parent::getAdditionalFieldNames();
+		$additionalFields[] = 'pub-id::publisher-id';
+		return $additionalFields;
+	}
+
+	/**
 	 * Update the localized fields for this submission file.
 	 * @param $submissionFile SubmissionFile
 	 */

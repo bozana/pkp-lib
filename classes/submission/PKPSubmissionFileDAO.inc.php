@@ -58,6 +58,7 @@ abstract class PKPSubmissionFileDAO extends PKPFileDAO {
 	 * @param $fileStage int (optional) further restricts the selection to
 	 *  a given file stage.
 	 * @param $submissionId int|null (optional) for validation purposes only
+	 * @return SubmissionFile|null
 	 */
 	function getRevision($fileId, $revision, $fileStage = null, $submissionId = null) {
 		if (!($fileId && $revision)) return null;
@@ -482,6 +483,97 @@ abstract class PKPSubmissionFileDAO extends PKPFileDAO {
 				(int) $revision
 			)
 		);
+	}
+
+	/**
+	 * Checks if public identifier exists (other than for the specified
+	 * submission file ID, which is treated as an exception).
+	 * @param $pubIdType string One of the NLM pub-id-type values or
+	 * 'other::something' if not part of the official NLM list
+	 * (see <http://dtd.nlm.nih.gov/publishing/tag-library/n-4zh0.html>).
+	 * @param $pubId string
+	 * @param $fileId int An ID to be excluded from the search.
+	 * @param $contextId int
+	 * @return boolean
+	 */
+	function pubIdExists($pubIdType, $pubId, $fileId, $contextId) {
+		$result = $this->retrieve(
+			'SELECT COUNT(*)
+			FROM submission_file_settings sfs
+				INNER JOIN submission_files sf ON sfs.file_id = sf.file_id
+				INNER JOIN submissions s ON sf.submission_id = s.submission_id
+			WHERE sfs.setting_name = ? AND sfs.setting_value = ? AND sfs.file_id <> ? AND s.context_id = ?',
+			array(
+				'pub-id::'.$pubIdType,
+				$pubId,
+				(int) $fileId,
+				(int) $contextId
+			)
+		);
+		$returner = $result->fields[0] ? true : false;
+		$result->Close();
+		return $returner;
+	}
+
+	/**
+	 * Change the public ID of a submission.
+	 * @param $fileId int
+	 * @param $pubIdType string One of the NLM pub-id-type values or
+	 * 'other::something' if not part of the official NLM list
+	 * (see <http://dtd.nlm.nih.gov/publishing/tag-library/n-4zh0.html>).
+	 * @param $pubId string
+	 */
+	function changePubId($fileId, $pubIdType, $pubId) {
+		$submissionFile = $this->getLatestRevision($fileId);
+		$submissionFile->setStoredPubId($pubIdType, $pubId);
+		$this->updateObject($submissionFile);
+	}
+
+	/**
+	 * Delete the public ID of an article.
+	 * @param $fileId int
+	 * @param $pubIdType string One of the NLM pub-id-type values or
+	 * 'other::something' if not part of the official NLM list
+	 * (see <http://dtd.nlm.nih.gov/publishing/tag-library/n-4zh0.html>).
+	 */
+	function deletePubId($fileId, $pubIdType) {
+		$settingName = 'pub-id::'.$pubIdType;
+		$this->update(
+				'DELETE FROM submission_file_settings WHERE setting_name = ? AND file_id = ?',
+				array(
+					$settingName,
+					(int)$fileId
+				)
+		);
+		$this->flushCache();
+	}
+
+	/**
+	 * Delete the public IDs of all articles in a journal.
+	 * @param $contextId int
+	 * @param $pubIdType string One of the NLM pub-id-type values or
+	 * 'other::something' if not part of the official NLM list
+	 * (see <http://dtd.nlm.nih.gov/publishing/tag-library/n-4zh0.html>).
+	 */
+	function deleteAllPubIds($contextId, $pubIdType) {
+		$contextId = (int) $contextId;
+		$settingName = 'pub-id::'.$pubIdType;
+
+		$submissionDao = DAORegistry::getDAO('SubmissionDAO');
+		$submissions = $submissionDao->getByContextId($contextId);
+		while ($submission = $submissions->next()) {
+			$submissionFiles = $this->getBySubmissionId($submission->getId());
+			foreach ($submissionFiles as $submissionFile) {
+				$this->update(
+					'DELETE FROM submission_file_settings WHERE setting_name = ? AND file_id = ?',
+					array(
+						$settingName,
+						(int)$submissionFile->getFileId()
+					)
+				);
+			}
+		}
+		$this->flushCache();
 	}
 
 	/**
