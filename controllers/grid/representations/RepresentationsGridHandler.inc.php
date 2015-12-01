@@ -41,8 +41,9 @@ abstract class RepresentationsGridHandler extends CategoryGridHandler {
 			array(ROLE_ID_MANAGER, ROLE_ID_SUB_EDITOR),
 			array(
 				'fetchGrid', 'fetchRow', 'fetchCategory',
-				'addFormat', 'editFormat', 'updateFormat', 'deleteFormat',
+				'addFormat', 'editFormat', 'editFormatTab', 'updateFormat', 'deleteFormat',
 				'setApproved', 'setProofFileCompletion', 'selectFiles',
+				'pubIds', 'updatePubIds', 'clearPubId',
 			)
 		);
 	}

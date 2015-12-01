@@ -58,6 +58,7 @@ abstract class PKPSubmissionFileDAO extends PKPFileDAO {
 	 * @param $fileStage int (optional) further restricts the selection to
 	 *  a given file stage.
 	 * @param $submissionId int|null (optional) for validation purposes only
+	 * @return SubmissionFile|null
 	 */
 	function getRevision($fileId, $revision, $fileStage = null, $submissionId = null) {
 		if (!($fileId && $revision)) return null;
@@ -535,7 +536,6 @@ abstract class PKPSubmissionFileDAO extends PKPFileDAO {
 		);
 	}
 
-
 	/**
 	 * Return the mapping of genre categories to the lower
 	 * case class name of file implementation.
@@ -611,6 +611,17 @@ abstract class PKPSubmissionFileDAO extends PKPFileDAO {
 			SUBMISSION_FILE_DEPENDENT,
 			SUBMISSION_FILE_QUERY,
 		);
+	}
+
+	/**
+	 * Get a list of additional fields that do not have
+	 * dedicated accessors.
+	 * @return array
+	 */
+	function getAdditionalFieldNames() {
+		$additionalFields = parent::getAdditionalFieldNames();
+		$additionalFields[] = 'pub-id::publisher-id';
+		return $additionalFields;
 	}
 
 	//

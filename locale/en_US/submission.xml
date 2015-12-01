@@ -327,6 +327,9 @@
 	<message key="submission.indexing">Indexing</message>
 	<message key="submission.initiated">Initiated</message>
 
+    <!-- Identifiers -->
+    <message key="submission.identifiers">Identifiers</message>
+
 	<!-- Information Center -->
 	<message key="submission.informationCenter.submissionInfo">Submission Info</message>
 	<message key="submission.informationCenter.metadata">Metadata</message>
