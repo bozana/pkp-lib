@@ -141,6 +141,29 @@ class RepresentationsGridCellProvider extends DataObjectGridCellProvider {
 				case 'isComplete':
 					AppLocale::requireComponents(LOCALE_COMPONENT_PKP_EDITOR);
 					import('lib.pkp.classes.linkAction.request.AjaxAction');
+
+					import('lib.pkp.classes.linkAction.request.AjaxModal');
+					$title = __($submissionFile->getViewable()?'editor.submission.proofreading.revokeProofApproval':'editor.submission.proofreading.approveProof');
+					return array(new LinkAction(
+						$submissionFile->getViewable()?'approved':'not_approved',
+						new AjaxModal(
+							$router->url(
+								$request, null, null, 'setProofFileCompletion',
+								null,
+								array(
+									'submissionId' => $submissionFile->getSubmissionId(),
+									'fileId' => $submissionFile->getFileId(),
+									'revision' => $submissionFile->getRevision(),
+									'approval' => !$submissionFile->getViewable(),
+								)
+							),
+							$title,
+							'modal_approve'
+						),
+						$submissionFile->getViewable()?__('grid.catalogEntry.availableRepresentation.approved'):__('grid.catalogEntry.availableRepresentation.notApproved')
+					));
+
+					/*
 					return array(new LinkAction(
 						$submissionFile->getViewable()?'approved':'not_approved',
 						new RemoteActionConfirmationModal(
@@ -160,6 +183,7 @@ class RepresentationsGridCellProvider extends DataObjectGridCellProvider {
 						),
 						$submissionFile->getViewable()?__('grid.catalogEntry.availableRepresentation.approved'):__('grid.catalogEntry.availableRepresentation.notApproved')
 					));
+					*/
 			}
 		}
 		return parent::getCellActions($request, $row, $column);
