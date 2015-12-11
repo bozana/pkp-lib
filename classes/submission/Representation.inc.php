@@ -139,6 +139,34 @@ class Representation extends DataObject {
 	}
 
 	/**
+	 * Get a public ID for this representation.
+	 * @param @literal $pubIdType string One of the NLM pub-id-type values or
+	 * 'other::something' if not part of the official NLM list
+	 * (see <http://dtd.nlm.nih.gov/publishing/tag-library/n-4zh0.html>). @endliteral
+	 * @param $preview boolean If true, generate a non-persisted preview only.
+	 */
+	function getPubId($pubIdType, $preview = false) {
+		if ($pubIdType === 'publisher-id') {
+			$pubId = $this->getStoredPubId($pubIdType);
+			return ($pubId ? $pubId : null);
+		}
+
+		$pubIdPlugins = PluginRegistry::loadCategory('pubIds', true, $this->getContextId());
+
+		if (is_array($pubIdPlugins)) {
+			foreach ($pubIdPlugins as $pubIdPlugin) {
+				if ($pubIdPlugin->getPubIdType() == $pubIdType) {
+					// If we already have an assigned ID, use it.
+					$storedId = $this->getStoredPubId($pubIdType);
+					if (!empty($storedId)) return $storedId;
+
+					return $pubIdPlugin->getPubId($this, $preview);
+				}
+			}
+		}
+		return null;
+	}
+	/**
 	 * Get the context id from the submission assigned to this representation.
 	 * @return int
 	 */

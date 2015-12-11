@@ -26,8 +26,10 @@ abstract class PKPManageFileApiHandler extends Handler {
 		parent::Handler();
 		$this->addRoleAssignment(
 			array(ROLE_ID_MANAGER, ROLE_ID_SUB_EDITOR, ROLE_ID_ASSISTANT, ROLE_ID_REVIEWER, ROLE_ID_AUTHOR),
-			array('deleteFile', 'editMetadata', 'saveMetadata')
+			array('deleteFile', 'editMetadata', 'editMetadataTab', 'saveMetadata', 'identifiers', 'updateIdentifiers', 'clearPubId',)
 		);
+		// Load submission-specific translations
+		AppLocale::requireComponents(LOCALE_COMPONENT_PKP_SUBMISSION);
 	}
 
 	//
@@ -122,12 +124,79 @@ abstract class PKPManageFileApiHandler extends Handler {
 	}
 
 	/**
-	 * Edit submission file metadata.
+	 * Edit proof submission file's pub ids.
+	 * @param $args array
+	 * @param $request PKPRequest
+	 * @return JSONMessage JSON object
+	 */
+	function identifiers($args, $request) {
+		$submissionFile = $this->getAuthorizedContextObject(ASSOC_TYPE_SUBMISSION_FILE);
+		$stageId = $request->getUserVar('stageId');
+		import('controllers.tab.pubIds.form.PublicIdentifiersForm');
+		$form = new PublicIdentifiersForm($submissionFile, $stageId);
+		$form->initData($request);
+		return new JSONMessage(true, $form->fetch($request));
+	}
+
+	/**
+	 * Update proof submission file's pub ids.
+	 * @param $args array
+	 * @param $request PKPRequest
+	 * @return JSONMessage JSON object
+	 */
+	function updateIdentifiers($args, $request) {
+		$submissionFile = $this->getAuthorizedContextObject(ASSOC_TYPE_SUBMISSION_FILE);
+		$stageId = $request->getUserVar('stageId');
+		import('controllers.tab.pubIds.form.PublicIdentifiersForm');
+		$form = new PublicIdentifiersForm($submissionFile, $stageId);
+		$form->readInputData();
+		if ($form->validate($request)) {
+			$form->execute($request);
+			return DAO::getDataChangedEvent($submissionFile->getId());
+		} else {
+			return new JSONMessage(true, $form->fetch($request));
+		}
+	}
+
+	/**
+	 * Clear proof submission file's pub id.
+	 * @param $args array
+	 * @param $request Request
+	 * @return JSONMessage JSON object
+	 */
+	function clearPubId($args, $request) {
+		$submissionFile = $this->getAuthorizedContextObject(ASSOC_TYPE_SUBMISSION_FILE);
+		$stageId = $request->getUserVar('stageId');
+		import('controllers.tab.pubIds.form.PublicIdentifiersForm');
+		$form = new PublicIdentifiersForm($submissionFile, $stageId);
+		$form->clearPubId($request->getUserVar('pubIdPlugIn'));
+		return new JSONMessage(true);
+	}
+	/**
+	 * Edit submission file metadata modal.
 	 * @param $args array
 	 * @param $request Request
 	 * @return JSONMessage JSON object
 	 */
 	function editMetadata($args, $request) {
+		$submissionFile = $this->getAuthorizedContextObject(ASSOC_TYPE_SUBMISSION_FILE);
+		if ($submissionFile->getFileStage() == SUBMISSION_FILE_PROOF) {
+			$templateMgr = TemplateManager::getManager($request);
+			$templateMgr->assign('submissionFile', $submissionFile);
+			$templateMgr->assign('stageId', $request->getUserVar('stageId'));
+			return new JSONMessage(true, $templateMgr->fetch('controllers/api/file/editMetadata.tpl'));
+		} else {
+			return $this->editMetadataTab($args, $request);
+		}
+	}
+
+	/**
+	 * Edit submission file metadata tab.
+	 * @param $args array
+	 * @param $request Request
+	 * @return JSONMessage JSON object
+	 */
+	function editMetadataTab($args, $request) {
 		$submissionFile = $this->getAuthorizedContextObject(ASSOC_TYPE_SUBMISSION_FILE);
 		$reviewRound = $this->getAuthorizedContextObject(ASSOC_TYPE_REVIEW_ROUND);
 		$stageId = $request->getUserVar('stageId');
