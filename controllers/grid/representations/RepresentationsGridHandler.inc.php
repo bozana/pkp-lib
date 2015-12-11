@@ -41,8 +41,9 @@ abstract class RepresentationsGridHandler extends CategoryGridHandler {
 			array(ROLE_ID_MANAGER, ROLE_ID_SUB_EDITOR),
 			array(
 				'fetchGrid', 'fetchRow', 'fetchCategory',
-				'addFormat', 'editFormat', 'updateFormat', 'deleteFormat',
+				'addFormat', 'editFormat', 'editFormatTab', 'updateFormat', 'deleteFormat',
 				'setApproved', 'setProofFileCompletion', 'selectFiles',
+				'identifiers', 'updateIdentifiers', 'clearPubId',
 			)
 		);
 	}
@@ -96,6 +97,7 @@ abstract class RepresentationsGridHandler extends CategoryGridHandler {
 		// Load submission-specific translations
 		AppLocale::requireComponents(
 			LOCALE_COMPONENT_PKP_SUBMISSION,
+			LOCALE_COMPONENT_PKP_EDITOR,
 			LOCALE_COMPONENT_PKP_USER,
 			LOCALE_COMPONENT_PKP_DEFAULT
 		);
@@ -155,7 +157,26 @@ abstract class RepresentationsGridHandler extends CategoryGridHandler {
 			SUBMISSION_FILE_PROOF,
 			$submission->getId()
 		);
+
+		$confirmationText = __('editor.submission.proofreading.confirmRemoveCompletion');
+		if ($request->getUserVar('approval')) {
+			$confirmationText = __('editor.submission.proofreading.confirmCompletion');
+		}
+
 		if ($submissionFile && $submissionFile->getAssocType()==ASSOC_TYPE_REPRESENTATION) {
+			import('lib.pkp.controllers.grid.representations.form.AssignPublicIdentifiersForm');
+			$assignPublicIdentifiersForm = new AssignPublicIdentifiersForm($submissionFile, $request->getUserVar('approval'), $confirmationText);
+			if (!$request->getUserVar('confirmed')) {
+				// Display assign pub ids modal
+				$assignPublicIdentifiersForm->initData($args, $request);
+				return new JSONMessage(true, $assignPublicIdentifiersForm->fetch($request));
+			}
+			if ($request->getUserVar('approval')) {
+				// Asign pub ids
+				$assignPublicIdentifiersForm->readInputData();
+				$assignPublicIdentifiersForm->execute($request);
+			}
+
 			// Update the approval flag
 			$submissionFile->setViewable($request->getUserVar('approval')?1:0);
 			$submissionFileDao->updateObject($submissionFile);
