@@ -270,7 +270,7 @@ class PKPRegistrationForm extends Form {
 				$user->setDisabled(true);
 				$user->setDisabledReason(__('user.login.accountNotValidated'));
 			}
-
+			parent::execute($user);
 			$userDao->insertObject($user);
 			$userId = $user->getId();
 			if (!$userId) {
