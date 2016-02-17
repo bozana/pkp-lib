@@ -219,11 +219,20 @@ abstract class PKPPubIdPlugin extends LazyLoadPlugin {
 
 	/**
 	 * Get all publication objects of the given type.
-	 * @param $pubObjectType object
+	 * @param $pubObjectType string
 	 * @param $contextId integer
 	 * @return array
 	 */
 	abstract function getPubObjects($pubObjectType, $contextId);
+
+	/**
+	 * Get all sub publication objects of the given publication object.
+	 * @param $pubObjectType string
+	 * @param $pubObjectId integer
+	 * @param $contextId integer
+	 * @return array
+	 */
+	abstract function getSubPubObjects($pubObjectType, $pubObjectId, $contextId);
 
 	/**
 	 * Is this object type enabled in plugin settings

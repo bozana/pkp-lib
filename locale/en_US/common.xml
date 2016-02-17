@@ -180,6 +180,7 @@
 	<message key="common.notified">Notified</message>
 	<message key="common.notified.date">Notified: {$dateNotified}</message>
 	<message key="common.noMatches">No Matches</message>
+	<message key="common.object">Object</message>
 	<message key="common.off">Off</message>
 	<message key="common.on">On</message>
 	<message key="common.ok">OK</message>

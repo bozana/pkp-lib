@@ -135,6 +135,7 @@ class PKPPubIdPluginHelper {
 					}
 					if ($form->getData($pubIdPlugin->getAssignFormFieldName())) {
 						$pubId = $pubIdPlugin->getPubId($pubObject); // save it here or in the form?
+						$pubObject->setStoredPubId($pubIdPlugin->getPubIdType(), $pubId);
 					}
 				}
 			}
