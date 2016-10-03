@@ -66,6 +66,26 @@ class PKPUserDAO extends DAO {
 
 	/**
 	 * Retrieve a user by username.
+	 * @param $settingName string
+	 * @param $settingValue string
+	 * @return PKPUser
+	 */
+	function getBySetting($settingName, $settingValue) {
+		$result = $this->retrieve(
+			'SELECT u.* FROM users u, user_settings us WHERE u.user_id = us.user_id AND us.setting_name = ? AND us.setting_value = ?',
+			array($settingName, $settingValue)
+		);
+
+		$returner = null;
+		if ($result->RecordCount() != 0) {
+			$returner =& $this->_returnUserFromRowWithData($result->GetRowAssoc(false));
+		}
+		$result->Close();
+		return $returner;
+	}
+
+	/**
+	 * Retrieve a user by username.
 	 * @param $username string
 	 * @param $allowDisabled boolean
 	 * @return PKPUser
