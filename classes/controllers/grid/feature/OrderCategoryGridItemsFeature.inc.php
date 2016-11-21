@@ -103,8 +103,9 @@ class OrderCategoryGridItemsFeature extends OrderItemsFeature {
 			// Save categories sequence.
 			$firstSeqValue = $grid->getDataElementSequence(reset($gridCategoryElements));
 			foreach ($gridCategoryElements as $rowId => $element) {
-				$rowPosition = array_search($rowId, $categoriesData);
-				$newSequence = $firstSeqValue + $rowPosition;
+				$newSequence = array_search($rowId, $categoriesData) + 1;
+				//$rowPosition = array_search($rowId, $categoriesData);
+				//$newSequence = $firstSeqValue + $rowPosition;
 				$currentSequence = $grid->getDataElementSequence($element);
 				if ($newSequence != $currentSequence) {
 					$grid->setDataElementSequence($request, $rowId, $element, $newSequence);
