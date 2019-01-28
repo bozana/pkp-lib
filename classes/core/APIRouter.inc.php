@@ -172,7 +172,6 @@ class APIRouter extends PKPRouter {
 		// Additional query parameters
 		//
 		$additionalParameters = $this->_urlGetAdditionalParameters($request, $params, $escape);
-
 		//
 		// Assemble URL
 		//
