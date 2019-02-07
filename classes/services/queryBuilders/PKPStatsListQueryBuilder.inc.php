@@ -23,23 +23,26 @@ class PKPStatsListQueryBuilder extends BaseQueryBuilder {
 	/** @var int context ID */
 	protected $contextId = null;
 
-	/** @var string metric type ojs::counter or omp::counter */
+	/** @var string metric type OJS_METRIC_TYPE_COUNTER or OMP_METRIC_TYPE_COUNTER */
 	protected $metricType = null;
 
 	/** @var string defines what stats are needed */
 	protected $lookingFor = null;
 
-	/** @var string time segment */
-	protected $timeSegment = 'month';
+	/** @var string time segment, STATISTICS_DIMENSION_MONTH or STATISTICS_DIMENSION_DAY */
+	protected $timeSegment = STATISTICS_DIMENSION_MONTH;
+
+	/** @var string order column */
+	protected $orderColumn = null;
+
+	/** @var string order direction */
+	protected $orderDirection = STATISTICS_ORDER_DESC;
 
 	/** @var array columns (aggregation level) selection */
 	protected $columns = array();
 
 	/** @var array report-level filter selection */
 	protected $filters = array();
-
-	/** @var string order criteria */
-	protected $orderBy = array();
 
 	/** @var boolean if there is no existing object for the given search phrase */
 	protected $noObjectForSearchPhrase = null;
@@ -78,7 +81,48 @@ class PKPStatsListQueryBuilder extends BaseQueryBuilder {
 	 * @return \PKP\Services\QueryBuilders\PKPStatsListQueryBuilder
 	 */
 	public function timeSegment($timeSegment) {
-		$this->timeSegment = $timeSegment == 'day' ? STATISTICS_DIMENSION_DAY : STATISTICS_DIMENSION_MONTH;
+		$this->timeSegment = $timeSegment == STATISTICS_DIMENSION_DAY ? STATISTICS_DIMENSION_DAY : STATISTICS_DIMENSION_MONTH;
+		return $this;
+	}
+
+	/**
+	 * Set order column
+	 *
+	 * @param $orderColumn string
+	 *
+	 * @return \PKP\Services\QueryBuilders\PKPStatsListQueryBuilder
+	 */
+	public function orderColumn($orderColumn) {
+		switch($orderColumn) {
+			case 'total':
+				$this->orderColumn = STATISTICS_METRIC;
+				break;
+			case 'month':
+				$this->orderColumn = STATISTICS_DIMENSION_MONTH;
+				break;
+			case 'day':
+				$this->orderColumn = STATISTICS_DIMENSION_DAY;
+				break;
+		}
+		return $this;
+	}
+
+	/**
+	 * Set order direction
+	 *
+	 * @param $orderDirection string
+	 *
+	 * @return \PKP\Services\QueryBuilders\PKPStatsListQueryBuilder
+	 */
+	public function orderDirection($orderDirection) {
+		switch($orderDirection) {
+			case 'ASC':
+				$this->orderDirection = STATISTICS_ORDER_ASC;
+				break;
+			case 'DESC':
+				$this->orderDirection = STATISTICS_ORDER_DESC;
+				break;
+		}
 		return $this;
 	}
 
@@ -133,7 +177,7 @@ class PKPStatsListQueryBuilder extends BaseQueryBuilder {
 	}
 
 	/**
-	 * Set section IDs filter
+	 * Set (OJS) section i.e. (OMP) series IDs filter
 	 *
 	 * @param $sectionIds array | int
 	 *
@@ -157,24 +201,12 @@ class PKPStatsListQueryBuilder extends BaseQueryBuilder {
 		// pre-assumption: one of the dates exist
 		assert($dateStart != null || $dateEnd != null);
 
-		$from = $to = null;
-		// convert the date strings to the right format
-		if ($dateStart && preg_match('/(\d{4})-(\d{2})-(\d{2})/', $dateStart, $matches) === 1) {
-			$from = $matches[1] . $matches[2] . $matches[3];
-		}
-		if ($dateEnd && preg_match('/(\d{4})-(\d{2})-(\d{2})/', $dateEnd, $matches) === 1) {
-			$to = $matches[1] . $matches[2] . $matches[3];
-		}
-		// set the default value for from and to date, if missing
-		if ($to == null) {
-			$to = date('Ymd', time());
-		} elseif ($from == null) {
-			// TO-DO eventually: chose the start date differently ?
-			$from = '20010101';
-		}
+		$dateStart = $dateStart ? str_replace('-', '', $dateStart) : STATISTICS_EARLIEST_DATE;
+		$dateEnd = $dateEnd ? str_replace('-', '', $dateEnd) : date('Ymd', time());
+
 		// set the filter
-		$this->filters[STATISTICS_DIMENSION_DAY]['from'] = $from;
-		$this->filters[STATISTICS_DIMENSION_DAY]['to'] = $to;
+		$this->filters[STATISTICS_DIMENSION_DAY]['from'] = $dateStart;
+		$this->filters[STATISTICS_DIMENSION_DAY]['to'] = $dateEnd;
 	}
 
 	/**
@@ -202,39 +234,6 @@ class PKPStatsListQueryBuilder extends BaseQueryBuilder {
 				}
 				break;
 		}
-	}
-
-	/**
-	 * Add orderBy statement
-	 *
-	 * @param $orderBy string
-	 * @param $orderDirection string
-	 *
-	 * @return \PKP\Services\QueryBuilders\PKPStatsListQueryBuilder
-	 */
-	public function orderBy($orderBy, $orderDirection) {
-		$orderByColumn = $direction = null;
-		switch($orderBy) {
-			case 'total':
-				$orderByColumn = STATISTICS_METRIC;
-				break;
-			case 'month':
-				$orderByColumn = STATISTICS_DIMENSION_MONTH;
-				break;
-			case 'day':
-				$orderByColumn = STATISTICS_DIMENSION_DAY;
-				break;
-		}
-		switch($orderDirection) {
-			case 'ASC':
-				$direction = STATISTICS_ORDER_ASC;
-				break;
-			case 'DESC':
-				$direction = STATISTICS_ORDER_DESC;
-				break;
-		}
-		$this->orderBy[$orderByColumn] = $direction;
-		return $this;
 	}
 
 	/**
@@ -269,7 +268,7 @@ class PKPStatsListQueryBuilder extends BaseQueryBuilder {
 				if ($whereClause) {
 					$q->whereBetween($column, array($values['from'], $values['to']));
 				} elseif ($havingClause) {
-					$q->havingRaw($column . 'BETWEEN ? AND ?', [$values['from'], $values['to']]);
+					$q->havingRaw($column . ' BETWEEN ? AND ?', [$values['from'], $values['to']]);
 				}
 			} else {
 				// Element selection filter: The value is a scalar or an
@@ -310,8 +309,8 @@ class PKPStatsListQueryBuilder extends BaseQueryBuilder {
 		$q->setBindings($params);
 
 		// Build the order-by clause.
-		foreach ($this->orderBy as $orderColumn => $direction) {
-			$q->orderBy($orderColumn, $direction);
+		if ($this->orderColumn != null) {
+			$q->orderBy($this->orderColumn, $this->orderDirection);
 		}
 
 		// Allow third-party query statements
