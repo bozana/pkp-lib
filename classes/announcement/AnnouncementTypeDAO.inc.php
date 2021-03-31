@@ -16,8 +16,26 @@
 
 
 import('lib.pkp.classes.announcement.AnnouncementType');
+import('lib.pkp.classes.db.SchemaDAO');
 
-class AnnouncementTypeDAO extends DAO {
+class AnnouncementTypeDAO extends SchemaDAO {
+	var $schemaName = SCHEMA_ANNOUNCEMENT_TYPE;
+
+	/** @var string The name of the primary table for this object */
+	var $tableName = 'announcement_types';
+
+	/** @var string The name of the settings table for this object */
+	var $settingsTableName = 'announcement_type_settings';
+
+	/** @var string The column name for the object id in primary and settings tables */
+	var $primaryKeyColumn = 'type_id';
+
+	/** @var array Maps schema properties for the primary table to their column names */
+	var $primaryTableColumns = [
+		'id' => 'type_id',
+		'assocId' => 'assoc_id',
+		'assocType' => 'assoc_type',
+	];
 
 	/**
 	 * Generate a new data object.
@@ -49,96 +67,12 @@ class AnnouncementTypeDAO extends DAO {
 	}
 
 	/**
-	 * Get the locale field names.
-	 * @return array
-	 */
-	function getLocaleFieldNames() {
-		return ['name'];
-	}
-
-	/**
-	 * Internal function to return an AnnouncementType object from a row.
-	 * @param $row array
-	 * @return AnnouncementType
-	 */
-	function _fromRow($row) {
-		$announcementType = $this->newDataObject();
-		$announcementType->setId($row['type_id']);
-		$announcementType->setAssocType($row['assoc_type']);
-		$announcementType->setAssocId($row['assoc_id']);
-		$this->getDataObjectSettings('announcement_type_settings', 'type_id', $row['type_id'], $announcementType);
-
-		return $announcementType;
-	}
-
-	/**
-	 * Update the localized settings for this object
-	 * @param $announcementType object
-	 */
-	function updateLocaleFields($announcementType) {
-		$this->updateDataObjectSettings('announcement_type_settings', $announcementType,
-			['type_id' => (int) $announcementType->getId()]
-		);
-	}
-
-	/**
-	 * Insert a new AnnouncementType.
-	 * @param $announcementType AnnouncementType
-	 * @return int
-	 */
-	function insertObject($announcementType) {
-		$this->update(
-			sprintf('INSERT INTO announcement_types
-				(assoc_type, assoc_id)
-				VALUES
-				(?, ?)'),
-			[(int) $announcementType->getAssocType(), (int) $announcementType->getAssocId()]
-		);
-		$announcementType->setId($this->getInsertId());
-		$this->updateLocaleFields($announcementType);
-		return $announcementType->getId();
-	}
-
-	/**
-	 * Update an existing announcement type.
-	 * @param $announcementType AnnouncementType
-	 * @return boolean
-	 */
-	function updateObject($announcementType) {
-		$returner = $this->update(
-			'UPDATE	announcement_types
-			SET	assoc_type = ?,
-				assoc_id = ?
-			WHERE	type_id = ?',
-			[
-				(int) $announcementType->getAssocType(),
-				(int) $announcementType->getAssocId(),
-				(int) $announcementType->getId()
-			]
-		);
-
-		$this->updateLocaleFields($announcementType);
-		return $returner;
-	}
-
-	/**
-	 * Delete an announcement type. Note that all announcements with this type are also
-	 * deleted.
-	 * @param $announcementType AnnouncementType
-	 * @return boolean
-	 */
-	function deleteObject($announcementType) {
-		return $this->deleteById($announcementType->getId());
-	}
-
-	/**
 	 * Delete an announcement type by announcement type ID. Note that all announcements with
 	 * this type ID are also deleted.
 	 * @param $typeId int
 	 */
 	function deleteById($typeId) {
-		$this->update('DELETE FROM announcement_type_settings WHERE type_id = ?', [(int) $typeId]);
-		$this->update('DELETE FROM announcement_types WHERE type_id = ?', [(int) $typeId]);
+		parent::deleteById($typeId);
 
 		$announcementDao = DAORegistry::getDAO('AnnouncementDAO'); /* @var $announcementDao AnnouncementDAO */
 		$announcementDao->deleteByTypeId($typeId);

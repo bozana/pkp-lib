@@ -1,0 +1,37 @@
+{
+	"title": "Announcement Type",
+	"description": "An announcement type.",
+	"required": [
+		"assocType",
+		"assocId",
+		"name"
+	],
+	"properties": {
+		"_href": {
+			"type": "string",
+			"format": "uri",
+			"readOnly": true,
+			"apiSummary": true
+		},
+		"assocId": {
+			"type": "integer",
+			"apiSummary": true
+		},
+		"assocType": {
+			"type": "integer",
+			"apiSummary": true
+		},
+		"id": {
+			"type": "integer",
+			"apiSummary": true
+		},
+		"name": {
+			"type": "string",
+			"multilingual": true,
+			"apiSummary": true,
+			"validation": [
+				"nullable"
+			]
+		}
+	}
+}
