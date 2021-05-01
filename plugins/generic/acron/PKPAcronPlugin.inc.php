@@ -334,6 +334,11 @@ class PKPAcronPlugin extends GenericPlugin
             }
 
             foreach ($tree->getChildren() as $task) {
+                $file = 'debug.txt';
+                $current = file_get_contents($file);
+                $current .= print_r("++++ task ++++\n", true);
+                $current .= print_r($task, true);
+                file_put_contents($file, $current);
                 $frequency = $task->getChildByName('frequency');
 
                 $args = ScheduledTaskHelper::getTaskArgs($task);

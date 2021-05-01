@@ -1,0 +1,78 @@
+<?php
+
+/**
+ * @file classes/task/UpdateIPGeoDB.inc.php
+ *
+ * Copyright (c) 2013-2021 Simon Fraser University
+ * Copyright (c) 2003-2021 John Willinsky
+ * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
+ *
+ * @class UpdateIPGeoDB
+ * @ingroup tasks
+ *
+ * @brief Class responsible to send the monthly statistics report.
+ */
+
+use APP\core\Application;
+
+use PKP\file\FileManager;
+use PKP\file\PrivateFileManager;
+use PKP\scheduledTask\ScheduledTask;
+
+class UpdateIPGeoDB extends ScheduledTask
+{
+    /**
+     * @copydoc ScheduledTask::getName()
+     */
+    public function getName(): string
+    {
+        return __('admin.scheduledTask.updateGeoDB');
+    }
+
+    /**
+     * @copydoc ScheduledTask::executeActions()
+     */
+    public function executeActions(): bool
+    {
+        $dbipCityLiteFileName = 'https://download.db-ip.com/free/dbip-city-lite-' . date('Y') . '-' . date('m') . '.mmdb.gz';
+
+        $fileMgr = new PrivateFileManager();
+        $usageStatsDirPath = realpath($fileMgr->getBasePath()) . DIRECTORY_SEPARATOR . 'usageStats';
+        $downloadedFile = $usageStatsDirPath . DIRECTORY_SEPARATOR . date('Y') . '-' . date('m') . '.mmdb.gz';
+        $finalFileName = $usageStatsDirPath . DIRECTORY_SEPARATOR . 'IPGeoDB.mmdb';
+
+        try {
+            $client = Application::get()->getHttpClient();
+            $client->request('GET', $dbipCityLiteFileName, ['sink' => $downloadedFile]);
+        } catch (Exception $e) {
+            // TO-DO: log error
+            return false;
+        }
+
+        try {
+            $decompressedFile = $fileMgr->decompressFile($downloadedFile);
+        } catch (Exception $e) {
+            // TO-DO: log error
+            $file = 'debug.txt';
+            $current = file_get_contents($file);
+            $current .= print_r("++++ not decompressed ++++\n", true);
+            $current .= print_r($e, true);
+            file_put_contents($file, $current);
+
+            return false;
+        }
+
+        if (rename($decompressedFile, $finalFileName)) {
+            return $fileMgr->setMode($finalFileName, FileManager::FILE_MODE_MASK);
+        } else {
+            $file = 'debug.txt';
+            $current = file_get_contents($file);
+            $current .= print_r("++++ not renamed ++++\n", true);
+            file_put_contents($file, $current);
+
+            // TO-DO: log error
+            return false;
+        }
+        //return true;
+    }
+}
