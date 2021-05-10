@@ -1,0 +1,63 @@
+{
+	"title": "UsageEvent",
+	"description": "A usage event.",
+	"required": [
+		"time",
+		"ip",
+		"canonicalUrl"
+		"contextId",
+		"submissionId",
+		"representationId",
+		"assocType",
+		"assocId",
+		"userAgent"
+	],
+	"properties": {
+		"_href": {
+			"type": "string",
+			"format": "uri",
+			"readOnly": true,
+			"apiSummary": true
+		},
+		"time": {
+			"type": "string",
+			"apiSummary": true,
+			"validation": [
+				"date_format:Y-m-d H:i:s"
+			]
+		},
+		"ip": {
+			"type": "string",
+			"apiSummary": true
+		},
+		"canonicalUrl": {
+			"type": "string",
+			"format": "uri",
+			"apiSummary": true
+		},
+		"contextId": {
+			"type": "integer",
+			"apiSummary": true
+		},
+		"submissionId": {
+			"type": "integer",
+			"apiSummary": true
+		},
+		"representationId": {
+			"type": "integer",
+			"apiSummary": true
+		},
+		"assocType": {
+			"type": "integer",
+			"apiSummary": true
+		},
+		"assocId": {
+			"type": "integer",
+			"apiSummary": true
+		},
+		"userAgent": {
+			"type": "string",
+			"apiSummary": true
+		}
+	}
+}
