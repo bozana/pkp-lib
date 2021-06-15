@@ -47,4 +47,9 @@ class Repo
     {
         return App::make(\PKP\category\Repository::class);
     }
+
+    public static function institution(): \PKP\institution\Repository
+    {
+        return App::make(\PKP\institution\Repository::class);
+    }
 }
