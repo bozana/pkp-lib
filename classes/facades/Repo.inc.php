@@ -56,4 +56,9 @@ class Repo
     {
         return app()->make(SubmissionFileRepository::class);
     }
+
+    public static function institution(): \PKP\institution\Repository
+    {
+        return App::make(\PKP\institution\Repository::class);
+    }
 }
