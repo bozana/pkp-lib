@@ -16,8 +16,11 @@
 use APP\facades\Repo;
 use APP\file\PublicFileManager;
 use APP\handler\Handler;
+use APP\i18n\AppLocale;
 use APP\template\TemplateManager;
 
+use PKP\core\PKPApplication;
+use PKP\db\DAORegistry;
 use PKP\security\authorization\ContextAccessPolicy;
 use PKP\security\Role;
 use PKP\site\VersionCheck;
@@ -87,6 +90,9 @@ class ManagementHandler extends Handler
                 break;
             case 'announcements':
                 $this->announcements($args, $request);
+                break;
+            case 'institutions':
+                $this->institutions($args, $request);
                 break;
             default:
                 assert(false);
@@ -378,6 +384,64 @@ class ManagementHandler extends Handler
         ]);
 
         $templateMgr->display('management/announcements.tpl');
+    }
+
+    /**
+     * Display list of institutions
+     *
+     * @param $args array
+     * @param $request PKPRequest
+     */
+    public function institutions($args, $request)
+    {
+        $templateMgr = TemplateManager::getManager($request);
+        $this->setupTemplate($request);
+
+        $apiUrl = $request->getDispatcher()->url($request, PKPApplication::ROUTE_API, $request->getContext()->getPath(), 'institutions');
+
+        $supportedFormLocales = $request->getContext()->getSupportedFormLocales();
+        $localeNames = AppLocale::getAllLocales();
+        $locales = array_map(function ($localeKey) use ($localeNames) {
+            return ['key' => $localeKey, 'label' => $localeNames[$localeKey]];
+        }, $supportedFormLocales);
+
+        $institutionForm = new \PKP\components\forms\institution\PKPInstitutionForm($apiUrl, $locales);
+
+        $collector = Repo::institution()
+            ->getCollector()
+            ->filterByContextIds([$request->getContext()->getId()]);
+
+        $itemsMax = Repo::institution()->getCount($collector);
+        $items = Repo::institution()->getSchemaMap()->summarizeMany(
+            Repo::institution()->getMany($collector->limit(30))
+        );
+
+        $institutionsListPanel = new \PKP\components\listPanels\PKPInstitutionsListPanel(
+            'institutions',
+            __('manager.setup.institutions'),
+            [
+                'apiUrl' => $apiUrl,
+                'form' => $institutionForm,
+                'getParams' => [
+                    'contextIds' => [$request->getContext()->getId()],
+                    'count' => 30,
+                ],
+                'items' => $items,
+                'itemsMax' => $itemsMax,
+            ]
+        );
+
+        $templateMgr->setState([
+            'components' => [
+                $institutionsListPanel->id => $institutionsListPanel->getConfig(),
+            ],
+        ]);
+
+        $templateMgr->assign([
+            'pageTitle' => __('manager.setup.institutions'),
+        ]);
+
+        $templateMgr->display('management/institutions.tpl');
     }
 
     /**
