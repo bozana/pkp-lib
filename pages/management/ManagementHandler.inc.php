@@ -88,6 +88,9 @@ class ManagementHandler extends Handler
             case 'announcements':
                 $this->announcements($args, $request);
                 break;
+            case 'institutions':
+                $this->institutions($args, $request);
+                break;
             default:
                 assert(false);
                 $request->getDispatcher()->handle404();
@@ -362,6 +365,61 @@ class ManagementHandler extends Handler
         ]);
 
         $templateMgr->display('management/announcements.tpl');
+    }
+
+    /**
+     * Display list of institutions
+     *
+     * @param array $args
+     * @param PKPRequest $request
+     */
+    public function institutions($args, $request)
+    {
+        $templateMgr = TemplateManager::getManager($request);
+        $this->setupTemplate($request);
+
+        $apiUrl = $request->getDispatcher()->url($request, PKPApplication::ROUTE_API, $request->getContext()->getPath(), 'institutions');
+
+        $locales = $request->getContext()->getSupportedFormLocaleNames();
+        $locales = array_map(fn (string $locale, string $name) => ['key' => $locale, 'label' => $name], array_keys($locales), $locales);
+
+        $institutionForm = new \PKP\components\forms\institution\PKPInstitutionForm($apiUrl, $locales);
+
+        $collector = Repo::institution()
+            ->getCollector()
+            ->filterByContextIds([$request->getContext()->getId()]);
+
+        $itemsMax = Repo::institution()->getCount($collector);
+        $items = Repo::institution()->getSchemaMap()->summarizeMany(
+            Repo::institution()->getMany($collector->limit(30))
+        );
+
+        $institutionsListPanel = new \PKP\components\listPanels\PKPInstitutionsListPanel(
+            'institutions',
+            __('manager.setup.institutions'),
+            [
+                'apiUrl' => $apiUrl,
+                'form' => $institutionForm,
+                'getParams' => [
+                    'contextIds' => [$request->getContext()->getId()],
+                    'count' => 30,
+                ],
+                'items' => $items,
+                'itemsMax' => $itemsMax,
+            ]
+        );
+
+        $templateMgr->setState([
+            'components' => [
+                $institutionsListPanel->id => $institutionsListPanel->getConfig(),
+            ],
+        ]);
+
+        $templateMgr->assign([
+            'pageTitle' => __('manager.setup.institutions'),
+        ]);
+
+        $templateMgr->display('management/institutions.tpl');
     }
 
     /**

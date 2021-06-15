@@ -1434,6 +1434,9 @@ msgstr "User Management"
 msgid "navigation.viewFrontend"
 msgstr "View Site"
 
+msgid "institution.institutions"
+msgstr "Institutions"
+
 msgid "notification.addedAuditor"
 msgstr "Auditor added."
 
