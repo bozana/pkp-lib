@@ -18,6 +18,9 @@
 
 namespace PKP\payment;
 
+use PKP\core\Core;
+use PKP\db\DAORegistry;
+
 class QueuedPaymentDAO extends \PKP\db\DAO
 {
     /**
