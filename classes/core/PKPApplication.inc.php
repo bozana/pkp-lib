@@ -519,6 +519,8 @@ abstract class PKPApplication implements iPKPApplicationInfoProvider
             'SubmissionSubjectEntryDAO' => 'PKP\submission\SubmissionSubjectEntryDAO',
             'TimeZoneDAO' => 'PKP\i18n\TimeZoneDAO',
             'TemporaryFileDAO' => 'PKP\file\TemporaryFileDAO',
+            'UsageStatsTotalTemporaryRecordDAO' => 'PKP\statistics\UsageStatsTotalTemporaryRecordDAO',
+            'UsageStatsUniqueTemporaryRecordDAO' => 'PKP\statistics\UsageStatsUniqueTemporaryRecordDAO',
             'UserGroupAssignmentDAO' => 'PKP\security\UserGroupAssignmentDAO',
             'UserDAO' => 'PKP\user\UserDAO',
             'UserGroupDAO' => 'PKP\security\UserGroupDAO',
