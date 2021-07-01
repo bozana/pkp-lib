@@ -16,6 +16,8 @@
 namespace PKP\task;
 
 use APP\i18n\AppLocale;
+
+use Exception;
 use PKP\config\Config;
 use PKP\db\DAORegistry;
 use PKP\file\FileManager;
@@ -93,10 +95,10 @@ abstract class FileLoader extends ScheduledTask
 
         // Configure paths.
         if (!is_null($basePath)) {
-            $this->_stagePath = $basePath . DIRECTORY_SEPARATOR . FILE_LOADER_PATH_STAGING;
-            $this->_archivePath = $basePath . DIRECTORY_SEPARATOR . FILE_LOADER_PATH_ARCHIVE;
-            $this->_rejectPath = $basePath . DIRECTORY_SEPARATOR . FILE_LOADER_PATH_REJECT;
-            $this->_processingPath = $basePath . DIRECTORY_SEPARATOR . FILE_LOADER_PATH_PROCESSING;
+            $this->_stagePath = $basePath . DIRECTORY_SEPARATOR . self::FILE_LOADER_PATH_STAGING;
+            $this->_archivePath = $basePath . DIRECTORY_SEPARATOR . self::FILE_LOADER_PATH_ARCHIVE;
+            $this->_rejectPath = $basePath . DIRECTORY_SEPARATOR . self::FILE_LOADER_PATH_REJECT;
+            $this->_processingPath = $basePath . DIRECTORY_SEPARATOR . self::FILE_LOADER_PATH_PROCESSING;
         }
 
         // Set admin email and name.
@@ -199,7 +201,8 @@ abstract class FileLoader extends ScheduledTask
                 continue;
             }
 
-            if ($result === FILE_LOADER_RETURN_TO_STAGING) {
+            if ($result === self::FILE_LOADER_RETURN_TO_STAGING) {
+                // Send the file back to staging
                 $foundErrors = true;
                 $this->_stageFile();
                 // Let the script know what files were sent back to staging,
@@ -223,13 +226,13 @@ abstract class FileLoader extends ScheduledTask
      * A public helper function that can be used to ensure
      * that the file structure has actually been installed.
      *
-     * @param $install boolean Set this parameter to true to
+     * @param bool $install Set this parameter to true to
      *  install the folder structure if it is missing.
      *
-     * @return boolean True if the folder structure exists,
+     * @return bool True if the folder structure exists,
      *  otherwise false.
      */
-    public function checkFolderStructure($install = false)
+    public function checkFolderStructure(bool $install = false): bool
     {
         // Make sure that the base path is inside the private files dir.
         // The files dir has appropriate write permissions and is assumed
@@ -282,12 +285,10 @@ abstract class FileLoader extends ScheduledTask
     /**
      * Process the passed file.
      *
-     * @param $filePath string
-     *
-     * @see FileLoader::execute to understand
+     * @see FileLoader::executeActions to understand
      * the expected return values.
      */
-    abstract protected function processFile($filePath);
+    abstract protected function processFile(string $filePath);
 
     /**
      * Move file between filesystem directories.
@@ -298,7 +299,7 @@ abstract class FileLoader extends ScheduledTask
      *
      * @return string The destination path of the moved file.
      */
-    protected function moveFile($sourceDir, $destDir, $filename)
+    protected function moveFile(string $sourceDir, string $destDir, string $filename): string
     {
         $currentFilePath = $sourceDir . DIRECTORY_SEPARATOR . $filename;
         $destinationPath = $destDir . DIRECTORY_SEPARATOR . $filename;
@@ -395,10 +396,8 @@ abstract class FileLoader extends ScheduledTask
 
     /**
      * Send the passed message to the administrator by email.
-     *
-     * @param $message string
      */
-    private function _notify($message, $messageType)
+    private function _notify(string $message, string $messageType)
     {
         // Instantiate the email to the admin.
         $mail = new Mail();
