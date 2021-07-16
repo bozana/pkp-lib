@@ -197,6 +197,7 @@ class AdminHandler extends Handler
         $siteInformationForm = new \PKP\components\forms\site\PKPSiteInformationForm($apiUrl, $locales, $site);
         $siteBulkEmailsForm = new \PKP\components\forms\site\PKPSiteBulkEmailsForm($apiUrl, $site, $contexts);
         $themeForm = new \PKP\components\forms\context\PKPThemeForm($themeApiUrl, $locales);
+        $siteStatisticsForm = new \PKP\components\forms\site\PKPSiteStatisticsForm($apiUrl, $locales, $site);
 
         $templateMgr = TemplateManager::getManager($request);
 
@@ -207,6 +208,7 @@ class AdminHandler extends Handler
                 FORM_SITE_INFO => $siteInformationForm->getConfig(),
                 FORM_SITE_BULK_EMAILS => $siteBulkEmailsForm->getConfig(),
                 FORM_THEME => $themeForm->getConfig(),
+                FORM_SITE_STATISTICS => $siteStatisticsForm->getConfig(),
             ],
         ]);
 
@@ -237,6 +239,7 @@ class AdminHandler extends Handler
             'siteSetup',
             'languages',
             'bulkEmails',
+            'statistics',
         ];
 
         $tabs = [
@@ -250,6 +253,7 @@ class AdminHandler extends Handler
             'bulkEmails',
             'siteTheme',
             'siteAppearanceSetup',
+            'statistics',
         ];
 
         $singleContextSite = (Services::get('context')->getCount() == 1);
