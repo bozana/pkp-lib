@@ -318,8 +318,11 @@ class ManagementHandler extends Handler
 
         $licenseForm = new \APP\components\forms\context\LicenseForm($apiUrl, $locales, $context);
         $searchIndexingForm = new \PKP\components\forms\context\PKPSearchIndexingForm($apiUrl, $locales, $context, $sitemapUrl);
-
         $paymentSettingsForm = new \PKP\components\forms\context\PKPPaymentSettingsForm($paymentsUrl, $locales, $context);
+
+        $site = $request->getSite();
+        $contextStatisticsForm = new \PKP\components\forms\context\PKPContextStatisticsForm($apiUrl, $locales, $site, $context);
+
         $templateMgr->setConstants([
             'FORM_PAYMENT_SETTINGS' => FORM_PAYMENT_SETTINGS,
         ]);
@@ -329,6 +332,7 @@ class ManagementHandler extends Handler
                 FORM_LICENSE => $licenseForm->getConfig(),
                 FORM_SEARCH_INDEXING => $searchIndexingForm->getConfig(),
                 FORM_PAYMENT_SETTINGS => $paymentSettingsForm->getConfig(),
+                FORM_CONTEXT_STATISTICS => $contextStatisticsForm->getConfig(),
             ],
         ]);
         $templateMgr->assign('pageTitle', __('manager.distribution.title'));
