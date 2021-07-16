@@ -772,6 +772,37 @@
 				"regex:/^[a-zA-Z0-9]+([\\-_][a-zA-Z0-9]+)*$/"
 			],
 			"apiSummary": true
+		},
+		"enableGeoUsageStats": {
+			"type": "integer",
+			"description": "Enable Geo usage stats. `0` means that the Geo usage stats are disabled. `1` will enable the usage stats containing country information. `2` will enable, where possible, the usage stats containing country and region. `3` will enable, where possible, the usage stats containing country, region and city.",
+			"default": 0,
+			"validation": [
+				"in:0,1,2,3"
+			]
+		},
+		"enableInstitutionUsageStats": {
+			"type": "boolean",
+			"description": "Enable institution usage stats.",
+			"default": false
+		},
+		"enableUsageStatsDisplay": {
+			"type": "boolean",
+			"description": "Enable display of the usage stats for the reader.",
+			"default": false
+		},
+		"usageStatsDisplayChartType": {
+			"type": "string",
+			"description": "The chart type, `bar` or `line`, to use for usage stats display for the reader.",
+			"default": "bar",
+			"validation": [
+				"in:bar,line"
+			]
+		},
+		"usageStatsDisplayMaxCount": {
+			"type": "integer",
+			"description": "The maximum number of data to present at the same time for a specific x-axis poit.",
+			"default": 4
 		}
 	}
 }
