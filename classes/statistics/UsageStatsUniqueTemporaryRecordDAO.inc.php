@@ -16,6 +16,7 @@
 namespace PKP\statistics;
 
 use Illuminate\Support\Facades\DB;
+use PKP\config\Config;
 
 class UsageStatsUniqueTemporaryRecordDAO
 {
@@ -33,7 +34,7 @@ class UsageStatsUniqueTemporaryRecordDAO
     /**
      * Add the passed usage statistic record.
      *
-     * @param array $entryData [
+     * @param \stdClass $entryData [
      * 	issue_id
      *  time
      *  ip
@@ -51,27 +52,24 @@ class UsageStatsUniqueTemporaryRecordDAO
      *  instituionIds
      * ]
      */
-    public function insert(array $entryData, int $lineNumber, string $loadId)
+    public function insert(\stdClass $entryData, int $lineNumber, string $loadId)
     {
-        $file = 'debug.txt';
-        $current = file_get_contents($file);
-        $current .= print_r("++++ insert into usage_stats_unique_temporary_record ++++\n", true);
-        file_put_contents($file, $current);
-
         DB::table($this->table)->insert([
-            'date' => $entryData['time'],
+            'date' => $entryData->time,
+            'ip' => $entryData->ip,
+            'user_agent' => substr($entryData->userAgent, 0, 255),
             'line_number' => $lineNumber,
-            'issue_id' => array_key_exists('issueId', $entryData) ? $entryData['issueId'] : null,
-            'context_id' => $entryData['contextId'],
-            'submission_id' => $entryData['submissionId'],
-            'representation_id' => $entryData['representationId'],
-            'assoc_type' => $entryData['assocType'],
-            'assoc_id' => $entryData['assocId'],
-            'file_type' => $entryData['fileType'],
-            'country' => $entryData['country'],
-            'region' => $entryData['region'],
-            'city' => $entryData['city'],
-            'institution_ids' => implode('-', $entryData['institutionIds']),
+            'issue_id' => !empty($entryData->ssueId) ? $entryData->issueId : null,
+            'context_id' => $entryData->contextId,
+            'submission_id' => $entryData->submissionId,
+            'representation_id' => $entryData->representationId,
+            'assoc_type' => $entryData->assocType,
+            'assoc_id' => $entryData->assocId,
+            'file_type' => $entryData->fileType,
+            'country' => $entryData->country,
+            'region' => $entryData->region,
+            'city' => $entryData->city,
+            'institution_ids' => implode('-', $entryData->institutionIds),
             'load_id' => $loadId,
         ]);
     }
@@ -86,17 +84,14 @@ class UsageStatsUniqueTemporaryRecordDAO
     }
 
     /**
-     * Delete the record with the passed assoc id and type with
-     * the most recent day value.
+     * Remove Unique Clicks
      */
-    public function deleteRecord(int $contextId, int $submissionId, int $lineNumber, $time, string $loadId)
+    public function removeUniqueClicks()
     {
-        DB::table($this->table)
-            ->where('context_id', '=', $contextId)
-            ->where('submission_id', '=', $submissionId)
-            ->where('line_number', '=', $lineNumber)
-            ->where('date', '=', $time)
-            ->where('load_id', '=', $loadId)
-            ->delete();
+        if (substr(Config::getVar('database', 'driver'), 0, strlen('postgres')) === 'postgres') {
+            // TO-DO
+        } else {
+            DB::statement("DELETE usu FROM {$this->table} usu JOIN {$this->table} usut ON (usut.load_id = usu.load_id AND usut.ip = usu.ip AND usut.user_agent = usu.user_agent AND usut.context_id = usu.context_id AND usut.submission_id = usu.submission_id) WHERE TIMESTAMPDIFF(HOUR, usu.date, usut.date) = 0 AND usu.line_number < usut.line_number");
+        }
     }
 }

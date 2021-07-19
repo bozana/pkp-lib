@@ -101,98 +101,39 @@ class UsageStatsLoader extends FileLoader
         $statsTotalDao->deleteByLoadId($loadId);
         $statsUniqueDao->deleteByLoadId($loadId);
 
-        $lastInsertedUniqueEntries = $lastInsertedTotalEntries = [];
         $lineNumber = 0;
-
         while (!feof($fhandle)) {
-            $considerUniqueItem = false;
             $lineNumber++;
             $line = trim(fgets($fhandle));
             if (empty($line) || substr($line, 0, 1) === '#') {
                 continue;
             } // Spacing or comment lines.
 
-            $entryData = json_decode($line, true);
+            $entryData = json_decode($line);
 
-            if (!$this->_isLogEntryValid($entryData)) {
-                // TO-DO: move plugins.generic.usageStats.invalidLogEntry to usageStats.invalidLogEntry
-                throw new \Exception(__(
-                    'plugins.generic.usageStats.invalidLogEntry',
-                    ['file' => $filePath, 'lineNumber' => $lineNumber]
+            try {
+                $this->_isLogEntryValid($entryData);
+            } catch (Exception $e) {
+                throw new Exception(__(
+                    'usageStats.invalidLogEntry',
+                    ['file' => $filePath, 'lineNumber' => $lineNumber, 'error' => $e]
                 ));
             }
 
             // Avoid bots.
-            if (Core::isUserAgentBot($entryData['userAgent'])) {
+            if (Core::isUserAgentBot($entryData->userAgent)) {
                 continue;
             }
 
-            //$entryData['canonicalUrl'] = urldecode($entryData['canonicalUrl']); // this should not be necessary?
-            $userIdentification = $entryData['ip'] . $entryData['userAgent'];
-            $day = date('Y-m-d', strtotime($entryData['time']));
-            $hour = date('H', strtotime($entryData['time']));
-
-            if (!empty($entryData['submissionId'])) {
-                $considerUniqueItem = true;
-            }
-
-            // Consider double click filtering.
-            $totalEntryHash = $entryData['canonicalUrl'] . $userIdentification;
-            $totalTimeFilter = self::COUNTER_DOUBLE_CLICK_TIME_FILTER_SECONDS;
-            // Because the entries are ordered by date-time, we can
-            // clean the last inserted total entries, removing the entries that have
-            // no importance for the time between requests check i.e.
-            // entries older than the time defined in the double click time filter.
-            // Those are stored in the temporary DB table (s. below).
-            foreach ($lastInsertedTotalEntries as $hash => $hashTimeLineNoArray) {
-                if ($hashTimeLineNoArray['time'] + $totalTimeFilter < strtotime($entryData['time'])) {
-                    unset($lastInsertedTotalEntries[$hash]);
-                }
-            }
-
-            // Remove double clicks
-            if (isset($lastInsertedTotalEntries[$totalEntryHash])) {
-                $secondsBetweenRequests = strtotime($entryData['time']) - $lastInsertedTotalEntries[$totalEntryHash]['time'];
-                if ($secondsBetweenRequests < $totalTimeFilter) {
-                    $dateTimeToDelete = date('Y-m-d H:i:s', $lastInsertedTotalEntries[$totalEntryHash]['time']);
-                    // We have to store the current entry, so we delete the last one.
-                    $statsTotalDao->deleteRecord($entryData['canonicalUrl'], $lastInsertedTotalEntries[$totalEntryHash]['lineNumber'], $dateTimeToDelete, $loadId);
-                }
-            }
-
-            $lastInsertedTotalEntries[$totalEntryHash]['time'] = strtotime($entryData['time']);
-            $lastInsertedTotalEntries[$totalEntryHash]['lineNumber'] = $lineNumber;
             $statsTotalDao->insert($entryData, $lineNumber, $loadId);
-
-            if ($considerUniqueItem) {
-                // Consider unique item filtering
-                // There fore the day is sliced into 24 hour pieces.
-                $uniqueEntryHash = $entryData['contextId'] . $entryData['submissionId'] . $userIdentification . $day;
-                // Because the entries are ordered by date-time, we can
-                // clean the last inserted unique entries, removing the entries that have
-                // no importance for the time between requests check i.e.
-                // entries older than the current hour.
-                // Those are stored in the temporary DB table (s. below).
-                foreach ($lastInsertedUniqueEntries as $hash => $hashHourArray) {
-                    foreach ($hashHourArray as $hashHour => $hashTimeLineNoArray) {
-                        if ($hashHour < $hour) {
-                            unset($lastInsertedUniqueEntries[$hash][$hashHour]);
-                        }
-                    }
-                }
-                // Remove unique clicks
-                if (isset($lastInsertedUniqueEntries[$uniqueEntryHash][$hour])) {
-                    $dateTimeToDelete = date('Y-m-d H:i:s', $lastInsertedUniqueEntries[$uniqueEntryHash][$hour]['time']);
-                    // We store the current entry, so we delete the last one.
-                    $statsUniqueDao->deleteRecord($entryData['contextId'], $entryData['submissionId'], $lastInsertedUniqueEntries[$uniqueEntryHash][$hour]['lineNumber'], $dateTimeToDelete, $loadId);
-                }
-                $lastInsertedUniqueEntries[$uniqueEntryHash][$hour]['time'] = strtotime($entryData['time']);
-                $lastInsertedUniqueEntries[$uniqueEntryHash][$hour]['lineNumber'] = $lineNumber;
+            if (!empty($entryData->submissionId)) {
                 $statsUniqueDao->insert($entryData, $lineNumber, $loadId);
             }
         }
-
         fclose($fhandle);
+
+        $statsTotalDao->removeDoubleClicks();
+        $statsUniqueDao->removeUniqueClicks();
         /*
         $loadResult = $this->_loadData($loadId);
         $statsTotalDao->deleteByLoadId($loadId);
@@ -301,28 +242,24 @@ class UsageStatsLoader extends FileLoader
     /**
      * Validate an usage log entry.
      */
-    private function _isLogEntryValid(array $entry): bool
+    private function _isLogEntryValid(stdClass $entry)
     {
-        if (empty($entry)) {
-            return false;
-        }
-
-        if (!$this->_validateDate($entry['time'])) {
-            return false;
+        if (!$this->_validateDate($entry->time)) {
+            throw new Exception(__('usageStats.invalidLogEntry.time'));
         }
         // check hashed IP ?
         // check canonicalUrl ?
-        if (!is_numeric($entry['contextId'])) {
-            return false;
+        if (!is_int($entry->contextId)) {
+            throw new Exception(__('usageStats.invalidLogEntry.contextId'));
         }
-        if (!empty($entry['issueId']) && !is_numeric($entry['issueId'])) {
-            return false;
+        if (!empty($entry->issueId) && !is_int($entry->issueId)) {
+            throw new Exception(__('usageStats.invalidLogEntry.issueId'));
         }
-        if (!empty($entry['submissionId']) && !is_numeric($entry['submissionId'])) {
-            return false;
+        if (!empty($entry->submissionId) && !is_int($entry->submissionId)) {
+            throw new Exception(__('usageStats.invalidLogEntry.submissionId'));
         }
-        if (!empty($entry['representationId']) && !is_numeric($entry['representationId'])) {
-            return false;
+        if (!empty($entry->representationId) && !is_int($entry->representationId)) {
+            throw new Exception(__('usageStats.invalidLogEntry.representationId'));
         }
         $validAssocTypes = [
             Application::ASSOC_TYPE_SUBMISSION_FILE,
@@ -332,11 +269,11 @@ class UsageStatsLoader extends FileLoader
             Application::ASSOC_TYPE_ISSUE,
             Application::ASSOC_TYPE_JOURNAL,
         ];
-        if (!in_array($entry['assocType'], $validAssocTypes)) {
-            return false;
+        if (!in_array($entry->assocType, $validAssocTypes)) {
+            throw new Exception(__('usageStats.invalidLogEntry.assocType'));
         }
-        if (!is_numeric($entry['assocId'])) {
-            return false;
+        if (!is_int($entry->assocId)) {
+            throw new Exception(__('usageStats.invalidLogEntry.assocId'));
         }
         $validFileTypes = [
             StatisticsHelper::STATISTICS_FILE_TYPE_PDF,
@@ -344,20 +281,18 @@ class UsageStatsLoader extends FileLoader
             StatisticsHelper::STATISTICS_FILE_TYPE_HTML,
             StatisticsHelper::STATISTICS_FILE_TYPE_OTHER,
         ];
-        if (!empty($entry['fileType']) && !in_array($entry['fileType'], $validFileTypes)) {
-            return false;
+        if (!empty($entry->fileType) && !in_array($entry->fileType, $validFileTypes)) {
+            throw new Exception(__('usageStats.invalidLogEntry.fileType'));
         }
-        if (!empty($entry['country']) && (!ctype_alpha($entry['country']) || !strlen($entry['country'] == 2))) {
-            return false;
+        if (!empty($entry->country) && (!ctype_alpha($entry->country) || !strlen($entry->country == 2))) {
+            throw new Exception(__('usageStats.invalidLogEntry.country'));
         }
-        if (!empty($entry['region']) && (!ctype_alnum($entry['region']) || !strlen($entry['region'] <= 3))) {
-            return false;
+        if (!empty($entry->region) && (!ctype_alnum($entry->region) || !strlen($entry->region <= 3))) {
+            throw new Exception(__('usageStats.invalidLogEntry.region'));
         }
-        if (!is_array($entry['institutionIds'])) {
-            return false;
+        if (!is_array($entry->institutionIds)) {
+            throw new Exception(__('usageStats.invalidLogEntry.institutionIds'));
         }
-
-        return true;
     }
 
     /**

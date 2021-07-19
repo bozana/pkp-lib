@@ -27,6 +27,8 @@ class UsageStatsTemp extends Migration
         // Usage stats total temporary records
         Schema::create('usage_stats_total_temporary_records', function (Blueprint $table) {
             $table->dateTime('date', $precision = 0);
+            $table->string('ip', 255);
+            $table->string('user_agent', 255);
             $table->bigInteger('line_number');
             $table->string('canonical_url', 255);
             $table->bigInteger('issue_id')->nullable();
@@ -46,6 +48,8 @@ class UsageStatsTemp extends Migration
         // Usage stats unique temporary records
         Schema::create('usage_stats_unique_temporary_records', function (Blueprint $table) {
             $table->dateTime('date', $precision = 0);
+            $table->string('ip', 255);
+            $table->string('user_agent', 255);
             $table->bigInteger('line_number');
             $table->bigInteger('issue_id')->nullable();
             $table->bigInteger('context_id');

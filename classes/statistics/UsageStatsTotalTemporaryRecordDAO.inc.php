@@ -16,6 +16,7 @@
 namespace PKP\statistics;
 
 use Illuminate\Support\Facades\DB;
+use PKP\config\Config;
 
 class UsageStatsTotalTemporaryRecordDAO
 {
@@ -33,7 +34,7 @@ class UsageStatsTotalTemporaryRecordDAO
     /**
      * Add the passed usage statistic record.
      *
-     * @param array $entryData [
+     * @param \stdClass $entryData [
      * 	issue_id
      *  time
      *  ip
@@ -51,23 +52,25 @@ class UsageStatsTotalTemporaryRecordDAO
      *  instituionIds
      * ]
      */
-    public function insert(array $entryData, int $lineNumber, string $loadId)
+    public function insert(\stdClass $entryData, int $lineNumber, string $loadId)
     {
         DB::table($this->table)->insert([
-            'date' => $entryData['time'],
+            'date' => $entryData->time,
+            'ip' => $entryData->ip,
+            'user_agent' => substr($entryData->userAgent, 0, 255),
             'line_number' => $lineNumber,
-            'canonical_url' => $entryData['canonicalUrl'],
-            'issue_id' => array_key_exists('issueId', $entryData) ? $entryData['issueId'] : null,
-            'context_id' => $entryData['contextId'],
-            'submission_id' => $entryData['submissionId'],
-            'representation_id' => $entryData['representationId'],
-            'assoc_type' => $entryData['assocType'],
-            'assoc_id' => $entryData['assocId'],
-            'file_type' => $entryData['fileType'],
-            'country' => $entryData['country'],
-            'region' => $entryData['region'],
-            'city' => $entryData['city'],
-            'institution_ids' => implode('-', $entryData['institutionIds']),
+            'canonical_url' => $entryData->canonicalUrl,
+            'issue_id' => !empty($entryData->issueId) ? $entryData->issueId : null,
+            'context_id' => $entryData->contextId,
+            'submission_id' => $entryData->submissionId,
+            'representation_id' => $entryData->representationId,
+            'assoc_type' => $entryData->assocType,
+            'assoc_id' => $entryData->assocId,
+            'file_type' => $entryData->fileType,
+            'country' => $entryData->country,
+            'region' => $entryData->region,
+            'city' => $entryData->city,
+            'institution_ids' => implode('-', $entryData->institutionIds),
             'load_id' => $loadId,
         ]);
     }
@@ -82,16 +85,14 @@ class UsageStatsTotalTemporaryRecordDAO
     }
 
     /**
-     * Delete the record with the passed assoc id and type with
-     * the most recent day value.
+     * Remove Double Clicks
      */
-    public function deleteRecord(string $canonicalURL, int $lineNumber, $time, string $loadId)
+    public function removeDoubleClicks()
     {
-        DB::table($this->table)
-            ->where('canonical_url', '=', $canonicalURL)
-            ->where('line_number', '=', $lineNumber)
-            ->where('date', '=', $time)
-            ->where('load_id', '=', $loadId)
-            ->delete();
+        if (substr(Config::getVar('database', 'driver'), 0, strlen('postgres')) === 'postgres') {
+            // TO-DO
+        } else {
+            DB::statement("DELETE ust FROM {$this->table} ust JOIN {$this->table} ustt ON (ustt.load_id = ust.load_id AND ustt.ip = ust.ip AND ustt.user_agent = ust.user_agent AND ustt.canonical_url = ust.canonical_url) WHERE TIMESTAMPDIFF(SECOND, ust.date, ustt.date) < 30 AND TIMESTAMPDIFF(SECOND, ust.date, ustt.date) > 0 AND ust.line_number < ustt.line_number");
+        }
     }
 }
