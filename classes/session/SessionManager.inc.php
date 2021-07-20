@@ -106,8 +106,16 @@ class SessionManager
                 }
             }
 
-            // Update existing session's timestamp; will be saved when write is called
-            $this->userSession->setSecondsLastUsed($now);
+            $lastUsed = $this->userSession->getSecondsLastUsed();
+            $secondsInactive = time() - $lastUsed;
+            $expireAfterSeconds = 60 * 60;
+            if ($secondsInactive >= $expireAfterSeconds) {
+                session_unset();
+                session_destroy();
+            } else {
+                // Update existing session's timestamp; will be saved when write is called
+                $this->userSession->setSecondsLastUsed($now);
+            }
         }
 
         // Adding session_write_close as a shutdown function. This is a PHP
