@@ -688,25 +688,74 @@ class FileManager
     /**
      * Decompress passed gziped file.
      *
-     * @param $filePath string
      *
      * @return string The file path that was created.
      */
-    public function decompressFile($filePath)
+    public function gzDecompressFile(string $filePath): string
     {
-        return $this->_executeGzip($filePath, true);
+        $bufferSize = 4096; // read 4kb at a time
+        $destPath = str_replace('.gz', '', $filePath);
+        $error = false;
+
+        // Open our files (in binary mode)
+        $file = gzopen($filePath, 'rb');
+        if ($file === false) {
+            $error = true;
+        }
+        $destFile = fopen($destPath, 'wb');
+        while (!gzeof($file)) {
+            // Read buffer-size bytes
+            fwrite($destFile, gzread($file, $bufferSize));
+        }
+        fclose($destFile);
+        $success = gzclose($file);
+        if (false === $success) {
+            $error = true;
+        }
+
+        if ($error) {
+            throw new Exception(__('error.gzDecompressFile', ['filePath' => $filePath]));
+        } else {
+            unlink($filePath);
+            return $destPath;
+        }
     }
 
     /**
      * Compress passed file.
      *
-     * @param $filePath string The file to be compressed.
+     * @param string $filePath The file to be compressed.
+     * @param int $level Level of compression
      *
      * @return string The file path that was created.
      */
-    public function compressFile($filePath)
+    public function gzCompressFile(string $filePath, int $level = 9): string
     {
-        return $this->_executeGzip($filePath, false);
+        $bufferSize = 4096; // read 4kb at a time
+        $destPath = $filePath . '.gz';
+        $mode = 'wb' . $level;
+        $error = false;
+
+        $destFile = gzopen($destPath, $mode);
+        if ($destFile === false) {
+            $error = true;
+        }
+        $file = fopen($filePath, 'rb');
+        while (!feof($file)) {
+            gzwrite($destFile, fread($file, $bufferSize));
+        }
+        fclose($file);
+        $success = gzclose($destFile);
+        if (false === $success) {
+            $error = true;
+        }
+
+        if ($error) {
+            throw new Exception(__('error.gzCompressFile', ['filePath' => $filePath]));
+        } else {
+            unlink($filePath);
+            return $destPath;
+        }
     }
 
 

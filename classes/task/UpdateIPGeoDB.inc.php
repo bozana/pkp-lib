@@ -50,7 +50,7 @@ class UpdateIPGeoDB extends ScheduledTask
         }
 
         try {
-            $decompressedFile = $fileMgr->decompressFile($downloadedFile);
+            $decompressedFile = $fileMgr->gzDecompressFile($downloadedFile);
         } catch (Exception $e) {
             // TO-DO: log error
             $file = 'debug.txt';

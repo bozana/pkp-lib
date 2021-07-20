@@ -344,7 +344,7 @@ abstract class FileLoader extends ScheduledTask
         if (pathinfo($processingFilePath, PATHINFO_EXTENSION) == 'gz') {
             $fileMgr = new FileManager();
             try {
-                $processingFilePath = $fileMgr->decompressFile($processingFilePath);
+                $processingFilePath = $fileMgr->gzDecompressFile($processingFilePath);
                 $filename = pathinfo($processingFilePath, PATHINFO_BASENAME);
             } catch (Exception $e) {
                 $this->moveFile($this->_processingPath, $this->_stagePath, $filename);
@@ -379,7 +379,7 @@ abstract class FileLoader extends ScheduledTask
             try {
                 $fileMgr = new FileManager();
                 $filePath = $this->_archivePath . DIRECTORY_SEPARATOR . $this->_claimedFilename;
-                $fileMgr->compressFile($filePath);
+                $fileMgr->gzCompressFile($filePath);
             } catch (Exception $e) {
                 $this->addExecutionLogEntry($e->getMessage(), ScheduledTaskHelper::SCHEDULED_TASK_MESSAGE_TYPE_ERROR);
             }
