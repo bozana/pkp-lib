@@ -690,25 +690,92 @@ class FileManager
     /**
      * Decompress passed gziped file.
      *
-     * @param $filePath string
      *
      * @return string The file path that was created.
      */
-    public function decompressFile($filePath)
+    public function gzDecompressFile(string $filePath): string
     {
-        return $this->_executeGzip($filePath, true);
+        $bufferSize = 4096; // read 4kb at a time
+        $destPath = str_replace('.gz', '', $filePath);
+
+        // Open our files (in binary mode)
+        $file = gzopen($filePath, 'rb');
+        if ($file === false) {
+            throw new Exception(__('error.gzDecompressFile.gzopen', ['filePath' => $filePath]));
+        }
+        $destFile = fopen($destPath, 'wb');
+        if ($destFile === false) {
+            throw new Exception(__('error.gzDecompressFile.fopen', ['filePath' => $destPath]));
+        }
+        while (!gzeof($file)) {
+            // Read buffer-size bytes
+            $contents = gzread($file, $bufferSize);
+            if ($contents === false) {
+                throw new Exception(__('error.gzDecompressFile.gzread', ['file' => $file]));
+            }
+            if (fwrite($destFile, $contents) === false) {
+                throw new Exception(__('error.gzDecompressFile.fwrite', ['filePath' => $destFile]));
+            }
+        }
+        $success = fclose($destFile);
+        if (false === $success) {
+            throw new Exception(__('error.gzDecompressFile.fclose', ['filePath' => $destFile]));
+        }
+        $success = gzclose($file);
+        if (false === $success) {
+            throw new Exception(__('error.gzDecompressFile.gzclose', ['filePath' => $file]));
+        }
+
+        if (unlink($filePath) === false) {
+            throw new Exception(__('error.gzDecompressFile.unlink', ['filePath' => $filePath]));
+        }
+        return $destPath;
     }
 
     /**
      * Compress passed file.
      *
-     * @param $filePath string The file to be compressed.
+     * @param string $filePath The file to be compressed.
+     * @param int $level Level of compression
      *
      * @return string The file path that was created.
      */
-    public function compressFile($filePath)
+    public function gzCompressFile(string $filePath, int $level = 9): string
     {
-        return $this->_executeGzip($filePath, false);
+        $bufferSize = 4096; // read 4kb at a time
+        $destPath = $filePath . '.gz';
+        $mode = 'wb' . $level;
+
+        $destFile = gzopen($destPath, $mode);
+        if ($destFile === false) {
+            throw new Exception(__('error.gzCompressFile.gzopen', ['filePath' => $destPath]));
+        }
+        $file = fopen($filePath, 'rb');
+        if ($file === false) {
+            throw new Exception(__('error.gzCompressFile.fopen', ['filePath' => $filePath]));
+        }
+        while (!feof($file)) {
+            $contents = fread($file, $bufferSize);
+            if ($contents === false) {
+                throw new Exception(__('error.gzCompressFile.fread', ['filePath' => $file]));
+            }
+            if (gzwrite($destFile, $contents) === false) {
+                throw new Exception(__('error.gzCompressFile.gzwrite', ['filePath' => $destFile]));
+            }
+        }
+        $success = fclose($file);
+        if (false === $success) {
+            throw new Exception(__('error.gzCompressFile.fclose', ['filePath' => $file]));
+        }
+        $success = gzclose($destFile);
+        if (false === $success) {
+            throw new Exception(__('error.gzCompressFile.gzclose', ['filePath' => $destFile]));
+        }
+
+        if (unlink($filePath) === false) {
+            throw new Exception(__('error.gzCompressFile.unlink', ['filePath' => $filePath]));
+        }
+        return $destPath;
     }
 
 
