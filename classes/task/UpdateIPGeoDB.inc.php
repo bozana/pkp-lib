@@ -13,6 +13,8 @@
  * @brief Class responsible to monthly update the DB-IP city lite database used for Geo statistics.
  */
 
+namespace PKP\task;
+
 use APP\core\Application;
 
 use PKP\file\FileManager;
@@ -45,14 +47,14 @@ class UpdateIPGeoDB extends ScheduledTask
         try {
             $client = Application::get()->getHttpClient();
             $client->request('GET', $dbipCityLiteFileName, ['sink' => $downloadedFile]);
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             $this->addExecutionLogEntry($e->getMessage(), ScheduledTaskHelper::SCHEDULED_TASK_MESSAGE_TYPE_ERROR);
             return false;
         }
 
         try {
-            $decompressedFile = $fileMgr->decompressFile($downloadedFile);
-        } catch (Exception $e) {
+            $decompressedFile = $fileMgr->gzDecompressFile($downloadedFile);
+        } catch (\Exception $e) {
             $this->addExecutionLogEntry($e->getMessage(), ScheduledTaskHelper::SCHEDULED_TASK_MESSAGE_TYPE_ERROR);
             return false;
         }
@@ -66,4 +68,8 @@ class UpdateIPGeoDB extends ScheduledTask
 
         return true;
     }
+}
+
+if (!PKP_STRICT_MODE) {
+    class_alias('\PKP\task\UpdateIPGeoDB', '\UpdateIPGeoDB');
 }
