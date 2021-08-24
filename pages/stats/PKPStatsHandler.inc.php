@@ -13,13 +13,15 @@
  * @brief Handle requests for statistics pages.
  */
 
+use APP\core\Application;
 use APP\core\Request;
+use APP\core\Services;
 use APP\facades\Repo;
 
 use APP\handler\Handler;
-use APP\statistics\StatisticsHelper;
 
 use APP\template\TemplateManager;
+use PKP\plugins\PluginRegistry;
 use PKP\security\authorization\ContextAccessPolicy;
 use PKP\security\Role;
 use PKP\statistics\PKPStatisticsHelper;
@@ -243,8 +245,8 @@ class PKPStatsHandler extends Handler
         $dateEnd = date('Y-m-d', strtotime('yesterday'));
         $count = 30;
 
-        $timeline = Services::get('stats')->getTimeline(PKPStatisticsHelper::STATISTICS_DIMENSION_DAY, [
-            'assocTypes' => ASSOC_TYPE_SUBMISSION,
+        $timeline = Services::get('publicationStats')->getTimeline(PKPStatisticsHelper::STATISTICS_DIMENSION_DAY, [
+            'assocTypes' => Application::ASSOC_TYPE_SUBMISSION,
             'contextIds' => $context->getId(),
             'count' => $count,
             'dateStart' => $dateStart,
@@ -458,6 +460,11 @@ class PKPStatsHandler extends Handler
 
         $pluginName = $request->getUserVar('pluginName');
         $reportPlugins = PluginRegistry::loadCategory('reports');
+        $file = 'debug.txt';
+        $current = file_get_contents($file);
+        $current .= print_r("++++ reportPlugins ++++\n", true);
+        $current .= print_r($reportPlugins, true);
+        file_put_contents($file, $current);
 
         if ($pluginName == '' || !isset($reportPlugins[$pluginName])) {
             $request->redirect(null, null, 'stats', 'reports');
@@ -511,25 +518,18 @@ class PKPStatsHandler extends Handler
 
         $router = $request->getRouter();
         $context = $router->getContext($request);
-        $statsHelper = new StatisticsHelper();
 
-        $metricType = $request->getUserVar('metricType');
-        if (is_null($metricType)) {
-            $metricType = $context->getDefaultMetricType();
-        }
-
-        // Generates only one metric type report at a time.
-        if (is_array($metricType)) {
-            $metricType = current($metricType);
-        }
-        if (!is_scalar($metricType)) {
-            $metricType = null;
+        // Retrieve site-level report plugins.
+        $reportPlugin = PluginRegistry::loadPlugin('reports', 'usageStats', $context->getId());
+        if (!$reportPlugin) {
+            $request->redirect(null, 'stats', 'reports');
         }
 
-        $reportPlugin = $statsHelper->getReportPluginByMetricType($metricType);
-        if (!$reportPlugin || is_null($metricType)) {
-            $request->redirect(null, null, 'stats', 'reports');
-        }
+        $file = 'debug.txt';
+        $current = file_get_contents($file);
+        $current .= print_r("++++ reportPlugin ++++\n", true);
+        $current .= print_r($reportPlugin, true);
+        file_put_contents($file, $current);
 
         $columns = $request->getUserVar('columns');
         $filters = (array) json_decode($request->getUserVar('filters'));
@@ -546,187 +546,19 @@ class PKPStatsHandler extends Handler
         } else {
             $orderBy = [];
         }
+        $file = 'debug.txt';
+        $current = file_get_contents($file);
+        $current .= print_r("++++ generate report get csv ++++\n", true);
+        $current .= print_r("++++ filters ++++\n", true);
+        $current .= print_r($filters, true);
+        file_put_contents($file, $current);
 
-        $metrics = $reportPlugin->getMetrics($metricType, $columns, $filters, $orderBy);
-
-        $allColumnNames = $statsHelper->getColumnNames();
-        $columnOrder = array_keys($allColumnNames);
-        $columnNames = [];
-
-        foreach ($columnOrder as $column) {
-            if (in_array($column, $columns)) {
-                $columnNames[$column] = $allColumnNames[$column];
-            }
-
-            if ($column == PKPStatisticsHelper::STATISTICS_DIMENSION_ASSOC_TYPE && in_array(PKPStatisticsHelper::STATISTICS_DIMENSION_ASSOC_ID, $columns)) {
-                $columnNames['common.title'] = __('common.title');
-            }
-        }
-
-        // Make sure the metric column will always be present.
-        if (!in_array(PKPStatisticsHelper::STATISTICS_METRIC, $columnNames)) {
-            $columnNames[PKPStatisticsHelper::STATISTICS_METRIC] = $allColumnNames[PKPStatisticsHelper::STATISTICS_METRIC];
-        }
-
-        header('content-type: text/comma-separated-values');
-        header('content-disposition: attachment; filename=statistics-' . date('Ymd') . '.csv');
-        $fp = fopen('php://output', 'wt');
-        //Add BOM (byte order mark) to fix UTF-8 in Excel
-        fprintf($fp, chr(0xEF) . chr(0xBB) . chr(0xBF));
-        fputcsv($fp, [$reportPlugin->getDisplayName()]);
-        fputcsv($fp, [$reportPlugin->getDescription()]);
-        fputcsv($fp, [__('common.metric') . ': ' . $metricType]);
-        fputcsv($fp, [__('manager.statistics.reports.reportUrl') . ': ' . $request->getCompleteUrl()]);
-        fputcsv($fp, ['']);
-
-        // Just for better displaying.
-        $columnNames = array_merge([''], $columnNames);
-
-        fputcsv($fp, $columnNames);
-        foreach ($metrics as $record) {
-            $row = [];
-            foreach ($columnNames as $key => $name) {
-                if (empty($name)) {
-                    // Column just for better displaying.
-                    $row[] = '';
-                    continue;
-                }
-
-                // Give a chance for subclasses to set the row values.
-                if ($returner = $this->getReportRowValue($key, $record)) {
-                    $row[] = $returner;
-                    continue;
-                }
-
-                switch ($key) {
-                    case 'common.title':
-                        $assocId = $record[PKPStatisticsHelper::STATISTICS_DIMENSION_ASSOC_ID];
-                        $assocType = $record[PKPStatisticsHelper::STATISTICS_DIMENSION_ASSOC_TYPE];
-                        $row[] = $this->getObjectTitle($assocId, $assocType);
-                        break;
-                    case PKPStatisticsHelper::STATISTICS_DIMENSION_ASSOC_TYPE:
-                        $assocType = $record[PKPStatisticsHelper::STATISTICS_DIMENSION_ASSOC_TYPE];
-                        $row[] = $statsHelper->getObjectTypeString($assocType);
-                        break;
-                    case PKPStatisticsHelper::STATISTICS_DIMENSION_CONTEXT_ID:
-                        $assocId = $record[PKPStatisticsHelper::STATISTICS_DIMENSION_CONTEXT_ID];
-                        $assocType = Application::getContextAssocType();
-                        $row[] = $this->getObjectTitle($assocId, $assocType);
-                        break;
-                    case PKPStatisticsHelper::STATISTICS_DIMENSION_SUBMISSION_ID:
-                        if (isset($record[PKPStatisticsHelper::STATISTICS_DIMENSION_SUBMISSION_ID])) {
-                            $assocId = $record[PKPStatisticsHelper::STATISTICS_DIMENSION_SUBMISSION_ID];
-                            $assocType = ASSOC_TYPE_SUBMISSION;
-                            $row[] = $this->getObjectTitle($assocId, $assocType);
-                        } else {
-                            $row[] = '';
-                        }
-                        break;
-                    case PKPStatisticsHelper::STATISTICS_DIMENSION_REGION:
-                        if (isset($record[PKPStatisticsHelper::STATISTICS_DIMENSION_REGION]) && isset($record[PKPStatisticsHelper::STATISTICS_DIMENSION_COUNTRY])) {
-                            $geoLocationTool = $statsHelper->getGeoLocationTool();
-                            if ($geoLocationTool) {
-                                $regions = $geoLocationTool->getRegions($record[PKPStatisticsHelper::STATISTICS_DIMENSION_COUNTRY]);
-                                $regionId = $record[PKPStatisticsHelper::STATISTICS_DIMENSION_REGION];
-                                if (strlen($regionId) == 1) {
-                                    $regionId = '0' . $regionId;
-                                }
-                                if (isset($regions[$regionId])) {
-                                    $row[] = $regions[$regionId];
-                                    break;
-                                }
-                            }
-                        }
-                        $row[] = '';
-                        break;
-                    case PKPStatisticsHelper::STATISTICS_DIMENSION_PKP_SECTION_ID:
-                        $sectionId = null;
-                        if (isset($record[PKPStatisticsHelper::STATISTICS_DIMENSION_PKP_SECTION_ID])) {
-                            $sectionId = $record[PKPStatisticsHelper::STATISTICS_DIMENSION_PKP_SECTION_ID];
-                        }
-                        if ($sectionId) {
-                            $row[] = $this->getObjectTitle($sectionId, ASSOC_TYPE_SECTION);
-                        } else {
-                            $row[] = '';
-                        }
-                        break;
-                    case PKPStatisticsHelper::STATISTICS_DIMENSION_FILE_TYPE:
-                        if ($record[$key]) {
-                            $row[] = $statsHelper->getFileTypeString($record[$key]);
-                        } else {
-                            $row[] = '';
-                        }
-                        break;
-                    default:
-                        $row[] = $record[$key];
-                        break;
-                }
-            }
-            fputcsv($fp, $row);
-        }
-        fclose($fp);
+        $reportPlugin->getCSV($request, $columns, $filters, $orderBy);
     }
 
     //
     // Protected methods.
     //
-    /**
-     * Get the row value based on the column key (usually assoc types)
-     * and the current record.
-     *
-     * @param $key string|int
-     * @param $record array
-     *
-     * @return string
-     */
-    protected function getReportRowValue($key, $record)
-    {
-        return null;
-    }
-
-    /**
-     * Get data object title based on passed
-     * assoc type and id.
-     *
-     * @param $assocId int
-     * @param $assocType int
-     *
-     * @return string
-     */
-    protected function getObjectTitle($assocId, $assocType)
-    {
-        switch ($assocType) {
-            case Application::getContextAssocType():
-                $contextDao = Application::getContextDAO(); /** @var ContextDAO $contextDao */
-                $context = $contextDao->getById($assocId);
-                if (!$context) {
-                    break;
-                }
-                return $context->getLocalizedName();
-            case ASSOC_TYPE_SUBMISSION:
-                $submission = Repo::submission()->get($assocId, null, true);
-                if (!$submission) {
-                    break;
-                }
-                return $submission->getLocalizedTitle();
-            case ASSOC_TYPE_SECTION:
-                $sectionDao = Application::getSectionDAO();
-                $section = $sectionDao->getById($assocId);
-                if (!$section) {
-                    break;
-                }
-                return $section->getLocalizedTitle();
-            case ASSOC_TYPE_SUBMISSION_FILE:
-                $submissionFile = Services::get('submissionFile')->get($assocId);
-                if (!$submissionFile) {
-                    break;
-                }
-                return $submissionFile->getLocalizedData('name');
-        }
-
-        return __('manager.statistics.reports.objectNotFound');
-    }
-
     /**
      * Get a description for stats that require one
      *

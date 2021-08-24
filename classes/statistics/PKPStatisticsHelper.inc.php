@@ -26,26 +26,33 @@ abstract class PKPStatisticsHelper
     // Dimensions:
     // 1) publication object dimension:
     public const STATISTICS_DIMENSION_CONTEXT_ID = 'context_id';
-    public const STATISTICS_DIMENSION_PKP_SECTION_ID = 'pkp_section_id';
-    public const STATISTICS_DIMENSION_ASSOC_OBJECT_TYPE = 'assoc_object_type';
-    public const STATISTICS_DIMENSION_ASSOC_OBJECT_ID = 'assoc_object_id';
+
     public const STATISTICS_DIMENSION_SUBMISSION_ID = 'submission_id';
-    public const STATISTICS_DIMENSION_REPRESENTATION_ID = 'representation_id';
     public const STATISTICS_DIMENSION_ASSOC_TYPE = 'assoc_type';
-    public const STATISTICS_DIMENSION_ASSOC_ID = 'assoc_id';
     public const STATISTICS_DIMENSION_FILE_TYPE = 'file_type';
+    public const STATISTICS_DIMENSION_FILE_ID = 'file_id';
+    public const STATISTICS_DIMENSION_REPRESENTATION_ID = 'representation_id';
+    // helpers
+    public const STATISTICS_DIMENSION_PKP_SECTION_ID = 'pkp_section_id';
+    public const STATISTICS_DIMENSION_ASSOC_ID = 'assoc_id';
+
     // 2) time dimension:
+    public const STATISTICS_DIMENSION_YEAR = 'year';
     public const STATISTICS_DIMENSION_MONTH = 'month';
     public const STATISTICS_DIMENSION_DAY = 'day';
+    public const STATISTICS_DIMENSION_DATE = 'date';
+
     // 3) geography dimension:
-    public const STATISTICS_DIMENSION_COUNTRY = 'country_id';
+    public const STATISTICS_DIMENSION_COUNTRY = 'country';
     public const STATISTICS_DIMENSION_REGION = 'region';
     public const STATISTICS_DIMENSION_CITY = 'city';
-    // 4) metric type dimension (non-additive!):
-    public const STATISTICS_DIMENSION_METRIC_TYPE = 'metric_type';
 
     // Metrics:
     public const STATISTICS_METRIC = 'metric';
+    public const STATISTICS_METRIC_INVESTIGATIONS = 'metric_investigations';
+    public const STATISTICS_METRIC_INVESTIGATIONS_UNIQUE = 'metric_investigations_unique';
+    public const STATISTICS_METRIC_REQUESTS = 'metric_requests';
+    public const STATISTICS_METRIC_REQUESTS_UNIQUE = 'metric_requests_unique';
 
     // Ordering:
     public const STATISTICS_ORDER_ASC = 'ASC';
@@ -57,15 +64,12 @@ abstract class PKPStatisticsHelper
     public const STATISTICS_FILE_TYPE_OTHER = 3;
     public const STATISTICS_FILE_TYPE_DOC = 4;
 
-    // Geography.
-    public const STATISTICS_UNKNOWN_COUNTRY_ID = 'ZZ';
-
     // Constants used to filter time dimension to current time.
     public const STATISTICS_YESTERDAY = 'yesterday';
     public const STATISTICS_CURRENT_MONTH = 'currentMonth';
 
     // Set the earliest date used
-    public const STATISTICS_EARLIEST_DATE = '20010101';
+    public const STATISTICS_EARLIEST_DATE = '2001-01-01';
 
     public function __construct()
     {
@@ -98,116 +102,6 @@ abstract class PKPStatisticsHelper
             }
         }
         return $context;
-    }
-
-    /**
-    * Identify and canonicalize the filtered metric type.
-    *
-    * @param $metricType string|array A wildcard can be used to
-    * identify all metric types.
-    * @param $context null|Context
-    * @param $defaultSiteMetricType string
-    * @param $siteMetricTypes array
-    *
-    * @return null|array The canonicalized metric type array. Null if an error
-    *  occurred.
-    */
-    public function canonicalizeMetricTypes($metricType, $context, $defaultSiteMetricType, $siteMetricTypes)
-    {
-        // Metric type is null: Return the default metric for
-        // the filtered context.
-        if (is_null($metricType)) {
-            if ($context instanceof \PKP\context\Context) {
-                $metricType = $context->getDefaultMetricType();
-            } else {
-                $metricType = $defaultSiteMetricType;
-            }
-        }
-
-        // Canonicalize the metric type to an array of metric types.
-        if (!is_null($metricType)) {
-            if (is_scalar($metricType) && $metricType !== '*') {
-                // Metric type is a scalar value: Select a single metric.
-                $metricType = [$metricType];
-            } elseif ($metricType === '*') {
-                // Metric type is '*': Select all available metrics.
-                if ($context instanceof \PKP\context\Context) {
-                    $metricType = $context->getMetricTypes();
-                } else {
-                    $metricType = $siteMetricTypes;
-                }
-            } else {
-                // Only arrays are otherwise supported as metric type
-                // specification.
-                if (!is_array($metricType)) {
-                    $metricType = null;
-                }
-
-                // Metric type is an array: Select multiple metrics. This is the
-                // canonical format so no change is required.
-            }
-        }
-
-        return $metricType;
-    }
-
-    /**
-     * Get the report plugin that implements
-     * the passed metric type.
-     *
-     * @param $metricType string
-     *
-     * @return mixed ReportPlugin or null
-     */
-    public function &getReportPluginByMetricType($metricType)
-    {
-        $returner = null;
-
-        // Retrieve site-level report plugins.
-        $reportPlugins = PluginRegistry::loadCategory('reports', true, \PKP\core\PKPApplication::CONTEXT_SITE);
-        if (empty($reportPlugins) || empty($metricType)) {
-            return $returner;
-        }
-
-        if (is_scalar($metricType)) {
-            $metricType = [$metricType];
-        }
-
-        foreach ($reportPlugins as $reportPlugin) {
-            /** @var ReportPlugin $reportPlugin */
-            $pluginMetricTypes = $reportPlugin->getMetricTypes();
-            $metricTypeMatches = array_intersect($pluginMetricTypes, $metricType);
-            if (!empty($metricTypeMatches)) {
-                $returner = $reportPlugin;
-                break;
-            }
-        }
-
-        return $returner;
-    }
-
-    /**
-     * Get metric type display strings implemented by all
-     * available report plugins.
-     *
-     * @return array Metric type as index and the display string
-     * as values.
-     */
-    public function getAllMetricTypeStrings()
-    {
-        $allMetricTypes = [];
-        $reportPlugins = PluginRegistry::loadCategory('reports', true, \PKP\core\PKPApplication::CONTEXT_SITE);
-        if (!empty($reportPlugins)) {
-            foreach ($reportPlugins as $reportPlugin) {
-                /** @var ReportPlugin $reportPlugin */
-                $reportMetricTypes = $reportPlugin->getMetricTypes();
-                foreach ($reportMetricTypes as $metricType) {
-                    $allMetricTypes[$metricType] = $reportPlugin->getMetricDisplayType($metricType);
-                }
-            }
-        }
-
-        return $allMetricTypes;
     }
 
     /**
@@ -292,7 +186,6 @@ abstract class PKPStatisticsHelper
     {
         $dispatcher = $request->getDispatcher(); /** @var Dispatcher $dispatcher */
         $args = [
-            'metricType' => $metricType,
             'columns' => $columns,
             'filters' => json_encode($filter)
         ];
@@ -336,15 +229,15 @@ abstract class PKPStatisticsHelper
             self::STATISTICS_DIMENSION_ASSOC_ID => __('common.id'),
             self::STATISTICS_DIMENSION_ASSOC_TYPE => __('common.type'),
             self::STATISTICS_DIMENSION_FILE_TYPE => __('common.fileType'),
+            self::STATISTICS_DIMENSION_FILE_ID => __('common.file'),
             self::STATISTICS_DIMENSION_SUBMISSION_ID => $this->getAppColumnTitle(self::STATISTICS_DIMENSION_SUBMISSION_ID),
             self::STATISTICS_DIMENSION_CONTEXT_ID => $this->getAppColumnTitle(self::STATISTICS_DIMENSION_CONTEXT_ID),
             self::STATISTICS_DIMENSION_PKP_SECTION_ID => $this->getAppColumnTitle(self::STATISTICS_DIMENSION_PKP_SECTION_ID),
-            self::STATISTICS_DIMENSION_CITY => __('manager.statistics.city'),
-            self::STATISTICS_DIMENSION_REGION => __('manager.statistics.region'),
-            self::STATISTICS_DIMENSION_COUNTRY => __('common.country'),
+            //self::STATISTICS_DIMENSION_CITY => __('manager.statistics.city'),
+            //self::STATISTICS_DIMENSION_REGION => __('manager.statistics.region'),
+            //self::STATISTICS_DIMENSION_COUNTRY => __('common.country'),
             self::STATISTICS_DIMENSION_DAY => __('common.day'),
             self::STATISTICS_DIMENSION_MONTH => __('common.month'),
-            self::STATISTICS_DIMENSION_METRIC_TYPE => __('common.metric'),
             self::STATISTICS_METRIC => __('common.count')
         ];
     }
@@ -358,7 +251,7 @@ abstract class PKPStatisticsHelper
     protected function getReportObjectTypesArray()
     {
         return [
-            ASSOC_TYPE_SUBMISSION_FILE => __('submission.submit.submissionFiles')
+            Application::ASSOC_TYPE_SUBMISSION_FILE => __('submission.submit.submissionFiles')
         ];
     }
 
@@ -393,8 +286,6 @@ if (!PKP_STRICT_MODE) {
     foreach ([
         'STATISTICS_DIMENSION_CONTEXT_ID',
         'STATISTICS_DIMENSION_PKP_SECTION_ID',
-        'STATISTICS_DIMENSION_ASSOC_OBJECT_TYPE',
-        'STATISTICS_DIMENSION_ASSOC_OBJECT_ID',
         'STATISTICS_DIMENSION_SUBMISSION_ID',
         'STATISTICS_DIMENSION_REPRESENTATION_ID',
         'STATISTICS_DIMENSION_ASSOC_TYPE',
@@ -405,7 +296,6 @@ if (!PKP_STRICT_MODE) {
         'STATISTICS_DIMENSION_COUNTRY',
         'STATISTICS_DIMENSION_REGION',
         'STATISTICS_DIMENSION_CITY',
-        'STATISTICS_DIMENSION_METRIC_TYPE',
         'STATISTICS_METRIC',
         'STATISTICS_ORDER_ASC',
         'STATISTICS_ORDER_DESC',
@@ -413,7 +303,6 @@ if (!PKP_STRICT_MODE) {
         'STATISTICS_FILE_TYPE_PDF',
         'STATISTICS_FILE_TYPE_OTHER',
         'STATISTICS_FILE_TYPE_DOC',
-        'STATISTICS_UNKNOWN_COUNTRY_ID',
         'STATISTICS_YESTERDAY',
         'STATISTICS_CURRENT_MONTH',
         'STATISTICS_EARLIEST_DATE',

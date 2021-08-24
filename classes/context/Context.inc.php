@@ -16,10 +16,10 @@
 namespace PKP\context;
 
 use APP\core\Application;
+use APP\core\Services;
 use APP\i18n\AppLocale;
 
 use PKP\config\Config;
-use PKP\statistics\PKPStatisticsHelper;
 
 // Constant used to distinguish whether metadata is enabled and whether it
 // should be requested or required during submission
@@ -530,99 +530,18 @@ abstract class Context extends \PKP\core\DataObject
     /**
      * Get context main page views.
      *
+     * @deprecated 3.4
+     *
      * @return int
      */
     public function getViews()
     {
-        $application = Application::get();
-        return $application->getPrimaryMetricByAssoc(Application::getContextAssocType(), $this->getId());
-    }
-
-
-    //
-    // Statistics API
-    //
-    /**
-    * Return all metric types supported by this context.
-    *
-    * @return array An array of strings of supported metric type identifiers.
-    */
-    public function getMetricTypes($withDisplayNames = false)
-    {
-        // Retrieve report plugins enabled for this journal.
-        $reportPlugins = PluginRegistry::loadCategory('reports', true, $this->getId());
-        if (empty($reportPlugins)) {
-            return [];
+        $views = 0;
+        $metrics = Services::get('contextStats')->getMetrics([], [], ['contextIds' => [$this->getId()]])->toArray();
+        if (!empty($metrics)) {
+            $views = current($metrics)->metric;
         }
-
-        // Run through all report plugins and retrieve all supported metrics.
-        $metricTypes = [];
-        foreach ($reportPlugins as $reportPlugin) {
-            $pluginMetricTypes = $reportPlugin->getMetricTypes();
-            if ($withDisplayNames) {
-                foreach ($pluginMetricTypes as $metricType) {
-                    $metricTypes[$metricType] = $reportPlugin->getMetricDisplayType($metricType);
-                }
-            } else {
-                $metricTypes = array_merge($metricTypes, $pluginMetricTypes);
-            }
-        }
-
-        return $metricTypes;
-    }
-
-    /**
-    * Returns the currently configured default metric type for this context.
-    * If no specific metric type has been set for this context then the
-    * site-wide default metric type will be returned.
-    *
-    * @return null|string A metric type identifier or null if no default metric
-    *   type could be identified.
-    */
-    public function getDefaultMetricType()
-    {
-        $defaultMetricType = $this->getData('defaultMetricType');
-
-        // Check whether the selected metric type is valid.
-        $availableMetrics = $this->getMetricTypes();
-        if (empty($defaultMetricType)) {
-            if (count($availableMetrics) === 1) {
-                // If there is only a single available metric then use it.
-                $defaultMetricType = $availableMetrics[0];
-            } else {
-                // Use the site-wide default metric.
-                $application = Application::get();
-                $defaultMetricType = $application->getDefaultMetricType();
-            }
-        } else {
-            if (!in_array($defaultMetricType, $availableMetrics)) {
-                return null;
-            }
-        }
-
-        return $defaultMetricType;
-    }
-
-    /**
-    * Retrieve a statistics report pre-filtered on this context.
-    *
-    * @see <https://pkp.sfu.ca/wiki/index.php/OJSdeStatisticsConcept#Input_and_Output_Formats_.28Aggregation.2C_Filters.2C_Metrics_Data.29>
-    * for a full specification of the input and output format of this method.
-    *
-    * @param $metricType null|integer|array metrics selection
-    * @param $columns integer|array column (aggregation level) selection
-    * @param $orderBy array order criteria
-    * @param $range null|DBResultRange paging specification
-    *
-    * @return null|array The selected data as a simple tabular
-    *  result set or null if metrics are not supported by this context.
-    */
-    public function getMetrics($metricType = null, $columns = [], $filter = [], $orderBy = [], $range = null)
-    {
-        // Add a context filter and run the report.
-        $filter[PKPStatisticsHelper::STATISTICS_DIMENSION_CONTEXT_ID] = $this->getId();
-        $application = Application::get();
-        return $application->getMetrics($metricType, $columns, $filter, $orderBy, $range);
+        return $views;
     }
 }
 

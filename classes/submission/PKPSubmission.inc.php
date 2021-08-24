@@ -1474,12 +1474,23 @@ abstract class PKPSubmission extends \PKP\core\DataObject
     /**
      * Get views of the submission.
      *
+     * @deprecated 3.4
+     *
      * @return int
      */
     public function getViews()
     {
-        $application = Application::getApplication();
-        return $application->getPrimaryMetricByAssoc(ASSOC_TYPE_SUBMISSION, $this->getId());
+        $views = 0;
+        $filters = [
+            'contextIds' => [$this->getData('contextId')],
+            'submissinIds' => [$this->getId()],
+            'assocTypes' => [Application::ASSOC_TYPE_SUBMISSION],
+        ];
+        $metrics = Services::get('publicationStats')->getMetrics([], [], $filters)->toArray();
+        if (!empty($metrics)) {
+            $views = current($metrics)->metric;
+        }
+        return $views;
     }
 
     /**

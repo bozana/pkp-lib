@@ -10,122 +10,44 @@
  * @class PKPStatsService
  * @ingroup services
  *
- * @brief Helper class that encapsulates statistics business logic
+ * @brief Abstract class that contains common statistics services business logic
  */
 
 namespace PKP\services;
 
-use PKP\db\DAORegistry;
+use APP\core\Application;
+use APP\statistics\StatisticsHelper;
 use PKP\plugins\HookRegistry;
-use PKP\statistics\PKPStatisticsHelper;
 
-class PKPStatsService
+abstract class PKPStatsService
 {
-    /**
-     * Get all statistics records that match the passed arguments
-     *
-     * @param array $args [
-     *  @option array contextIds Return records for these contexts
-     *  @option array submissionIds Return records for these submissions
-     *  @option array sectionIds Return records for these sections
-     *  @option string dateEnd Return records on or before this date
-     *  @option string dateStart Return records on or after this date
-     *  @option array assocTypes Return records for these types of objects. One of ASSOC_TYPE_*
-     *  @option array assocIds Return records for these objects. Only used when assocTypes is set.
-     *  @option array fileTypes Return records for these file types. One of STATISTICS_FILE_TYPE_*
-     * ]
-     *
-     * @return array
-     */
-    public function getRecords($args = [])
-    {
-
-        // Get the stats constants
-        import('classes.statistics.StatisticsHelper');
-
-        $defaultArgs = [
-            'dateStart' => PKPStatisticsHelper::STATISTICS_EARLIEST_DATE,
-            'dateEnd' => date('Y-m-d', strtotime('yesterday')),
-
-            // Require a context to be specified to prevent unwanted data leakage
-            // if someone forgets to specify the context.
-            'contextIds' => [\PKP\core\PKPApplication::CONTEXT_ID_NONE],
-        ];
-
-        $args = array_merge($defaultArgs, $args);
-        $statsQB = $this->getQueryBuilder($args);
-
-        \HookRegistry::call('Stats::getRecords::queryBuilder', [&$statsQB, $args]);
-
-        $statsQO = $statsQB->getRecords();
-
-        $result = \DAORegistry::getDAO('MetricsDAO')
-            ->retrieve($statsQO->toSql(), $statsQO->getBindings());
-
-        $records = [];
-        foreach ($result as $row) {
-            $records[] = [
-                'loadId' => $row->load_id,
-                'contextId' => (int) $row->context_id,
-                'submissionId' => (int) $row->submission_id,
-                'assocType' => (int) $row->assoc_type,
-                'assocId' => (int) $row->assoc_id,
-                'day' => (int) $row->day,
-                'month' => (int) $row->month,
-                'fileType' => (int) $row->file_type,
-                'countryId' => $row->country_id,
-                'region' => $row->region,
-                'city' => $row->city,
-                'metric' => (int) $row->metric,
-                'metricType' => $row->metric_type,
-                'pkpSectionId' => (int) $row->pkp_section_id,
-                'assocObjectType' => (int) $row->assoc_object_type,
-                'assocObjectTId' => (int) $row->assoc_object_id,
-                'representation_id' => (int) $row->representation_id,
-            ];
-        }
-
-        return $records;
-    }
-
     /**
      * Get the sum of a set of metrics broken down by day or month
      *
      * @param string $timelineInterval STATISTICS_DIMENSION_MONTH or STATISTICS_DIMENSION_DAY
-     * @param array $args Filter the records to include. See self::getRecords()
+     * @param array $args Filter the records to include. See self::getQueryBuilder()
      *
-     * @return array
      */
-    public function getTimeline($timelineInterval, $args = [])
+    public function getTimeline(string $timelineInterval, array $args = []): array
     {
-        $defaultArgs = [
-            'dateStart' => PKPStatisticsHelper::STATISTICS_EARLIEST_DATE,
-            'dateEnd' => date('Y-m-d', strtotime('yesterday')),
-
-            // Require a context to be specified to prevent unwanted data leakage
-            // if someone forgets to specify the context. If you really want to
-            // get data across all contexts, pass an empty `contextId` arg.
-            'contextIds' => [\PKP\core\PKPApplication::CONTEXT_ID_NONE],
-        ];
-
+        $defaultArgs = array_merge($this->getDefaultArgs(), ['orderDirection' => StatisticsHelper::STATISTICS_ORDER_ASC]);
         $args = array_merge($defaultArgs, $args);
         $timelineQB = $this->getQueryBuilder($args);
 
-        HookRegistry::call('Stats::getTimeline::queryBuilder', [&$timelineQB, $args]);
+        HookRegistry::call(get_class($this) . '::getTimeline::queryBuilder', [&$timelineQB, $args]);
 
         $timelineQO = $timelineQB
             ->getSum([$timelineInterval])
-            ->orderBy($timelineInterval);
+            ->orderBy($timelineInterval, $args['orderDirection']);
 
-        $result = DAORegistry::getDAO('MetricsDAO')
-            ->retrieve($timelineQO->toSql(), $timelineQO->getBindings());
+        $result = $timelineQO->get();
 
         $dateValues = [];
         foreach ($result as $row) {
             $row = (array) $row;
-            $date = substr($row[$timelineInterval], 0, 4) . '-' . substr($row[$timelineInterval], 4, 2);
-            if ($timelineInterval === PKPStatisticsHelper::STATISTICS_DIMENSION_DAY) {
-                $date = substr($date, 0, 7) . '-' . substr($row[$timelineInterval], 6, 2);
+            $date = $row[$timelineInterval];
+            if ($timelineInterval === StatisticsHelper::STATISTICS_DIMENSION_MONTH) {
+                $date = substr($date, 0, 7);
             }
             $dateValues[$date] = (int) $row['metric'];
         }
@@ -146,155 +68,22 @@ class PKPStatsService
     }
 
     /**
-     * Get a list of objects ordered by their total stats
-     *
-     * The $args argument is used to determine what records to include in
-     * the results. The $groupBy argument is used to group these records.
-     *
-     * For example, to get a list of submissions ordered by their total PDF
-     * galley views:
-     *
-     * // Get all records with the PDF file type
-     * $args = ['fileType' => STATISTICS_FILE_TYPE_PDF]
-     *
-     * // Group them by their submission ID
-     * $groupBy = STATISTICS_DIMENSION_SUBMISSION_ID
-     *
-     * @param string $groupBy The column to sum the stats by.
-     * @param string $orderDirection STATISTICS_ORDER_ASC or STATISTICS_ORDER_DESC
-     * @param array $args Filter the records to include. See self::getRecords()
-     */
-    public function getOrderedObjects($groupBy, $orderDirection, $args = [])
-    {
-        $defaultArgs = [
-            'dateStart' => PKPStatisticsHelper::STATISTICS_EARLIEST_DATE,
-            'dateEnd' => date('Y-m-d', strtotime('yesterday')),
-
-            // Require a context to be specified to prevent unwanted data leakage
-            // if someone forgets to specify the context. If you really want to
-            // get data across all contexts, pass an empty `contextId` arg.
-            'contextIds' => [\PKP\core\PKPApplication::CONTEXT_ID_NONE],
-        ];
-
-        $args = array_merge($defaultArgs, $args);
-        $orderedQB = $this->getQueryBuilder($args);
-
-        HookRegistry::call('Stats::getOrderedObjects::queryBuilder', [&$orderedQB, $args]);
-
-        $orderedQO = $orderedQB
-            ->getSum([$groupBy])
-            ->orderBy('metric', $orderDirection === PKPStatisticsHelper::STATISTICS_ORDER_ASC ? 'asc' : 'desc');
-
-        $range = null;
-        if (isset($args['count'])) {
-            // $range = new DBResultRange($args['count'], null, $args['offset'] ?? 0);
-            $orderedQO->limit($args['count']);
-            if (isset($args['offset'])) {
-                $orderedQO->offset($args['offset']);
-            }
-        }
-
-        $result = $orderedQO->get();
-        // $result = DAORegistry::getDAO('MetricsDAO')
-        //     ->retrieveRange($orderedQO->toSql(), $orderedQO->getBindings(), $range);
-
-        $objects = [];
-        foreach ($result as $row) {
-            $row = (array) $row;
-            $objects[] = [
-                'id' => (int) $row[$groupBy],
-                'total' => (int) $row['metric'],
-            ];
-        }
-
-        return $objects;
-    }
-
-    /**
-     * A callback to be used with array_reduce() to add up the metric value
-     * for a record
-     *
-     * @param array $record
-     *
-     * @return integer
-     */
-    public function sumMetric($total, $record)
-    {
-        $total += $record['metric'];
-        return $total;
-    }
-
-    /**
-     * A callback to be used with array_filter() to return records for
-     * a file (galley, representation).
-     *
-     * @param array $record
-     *
-     * @return array
-     */
-    public function filterRecordFile($record)
-    {
-        return !empty($record['fileType']);
-    }
-
-    /**
-     * A callback to be used with array_filter() to return records for
-     * a pdf file.
-     *
-     * @param array $record
-     *
-     * @return array
-     */
-    public function filterRecordPdf($record)
-    {
-        return $record['fileType'] === PKPStatisticsHelper::STATISTICS_FILE_TYPE_PDF;
-    }
-
-    /**
-     * A callback to be used with array_filter() to return records for
-     * a HTML file.
-     *
-     * @param array $record
-     *
-     * @return array
-     */
-    public function filterRecordHtml($record)
-    {
-        return $record['fileType'] === PKPStatisticsHelper::STATISTICS_FILE_TYPE_HTML;
-    }
-
-    /**
-     * A callback to be used with array_filter() to return records for
-     * any Other files (all files that are not PDF or HTML).
-     *
-     * @param array $record
-     *
-     * @return array
-     */
-    public function filterRecordOther($record)
-    {
-        return $record['fileType'] === PKPStatisticsHelper::STATISTICS_FILE_TYPE_OTHER;
-    }
-
-    /**
      * Get all time segments (months or days) between the start and end date
      * with empty values.
      *
-     * @param $startDate string
-     * @param $endDate string
-     * @param $timelineInterval string STATISTICS_DIMENSION_MONTH or STATISTICS_DIMENSION_DAY
+     * @param string $timelineInterval STATISTICS_DIMENSION_MONTH or STATISTICS_DIMENSION_DAY
      *
      * @return array of time segments in ASC order
      */
-    public function getEmptyTimelineIntervals($startDate, $endDate, $timelineInterval)
+    public function getEmptyTimelineIntervals(string $startDate, string $endDate, string $timelineInterval): array
     {
-        if ($timelineInterval === PKPStatisticsHelper::STATISTICS_DIMENSION_MONTH) {
+        if ($timelineInterval === StatisticsHelper::STATISTICS_DIMENSION_MONTH) {
             $dateFormat = 'Y-m';
             $labelFormat = '%B %Y';
             $interval = 'P1M';
-        } elseif ($timelineInterval === PKPStatisticsHelper::STATISTICS_DIMENSION_DAY) {
+        } elseif ($timelineInterval === StatisticsHelper::STATISTICS_DIMENSION_DAY) {
             $dateFormat = 'Y-m-d';
-            $labelFormat = \Application::get()->getRequest()->getContext()->getLocalizedDateFormatLong();
+            $labelFormat = Application::get()->getRequest()->getContext()->getLocalizedDateFormatLong();
             $interval = 'P1D';
         }
 
@@ -315,37 +104,90 @@ class PKPStatsService
     }
 
     /**
-     * Get a QueryBuilder object with the passed args
+     * Get the sum of all matching records,
+     * grouped by $groupBy,
+     * ordered by $orderBy, one or more columns and their directions,
+     * filtered by $args.
      *
-     * @param array $args See self::getRecords()
+     * See child classes for detailed parameter explanation.
      *
-     * @return \PKP\services\queryBuilders\PKPStatsQueryBuilder
+     * @param array $groupBy
+     *  see getStatsColumns() of the child service for what columns can be selected
+     * 	assumes the given columns are correct i.e. exist
+     * @param array $orderBy
+     * 	column => StatisticsHelper::STATISTICS_ORDER_ASC or StatisticsHelper::STATISTICS_ORDER_DESC
+     * @param array $args
+     *  see prepareStatsArgs() of the child service for what arguments can be provided
+     *
      */
-    protected function getQueryBuilder($args = [])
+    public function getMetrics(array $groupBy = [], array $orderBy = [], array $args = []): \Illuminate\Support\Collection
     {
-        $statsQB = new \PKP\services\queryBuilders\PKPStatsQueryBuilder();
-        $statsQB
-            ->filterByContexts($args['contextIds'])
-            ->before($args['dateEnd'])
-            ->after($args['dateStart']);
+        $defaultArgs = $this->getDefaultArgs();
+        $args = array_merge($defaultArgs, $args);
+        $metricsQB = $this->getQueryBuilder($args);
 
-        if (!empty(($args['submissionIds']))) {
-            $statsQB->filterBySubmissions($args['submissionIds']);
-        }
+        HookRegistry::call(get_class($this) . '::getMetrics::queryBuilder', [&$metricsQB, $args]);
 
-        if (!empty($args['assocTypes'])) {
-            $statsQB->filterByAssocTypes($args['assocTypes']);
-            if (!empty($args['assocIds'])) {
-                $statsQB->filterByAssocIds($args['assocIds']);
+        $metricsQB = $metricsQB->getSum($groupBy);
+        if (!empty($orderBy)) {
+            foreach ($orderBy as $orderColumn => $direction) {
+                $direction === StatisticsHelper::STATISTICS_ORDER_ASC ? 'asc' : 'desc';
+                $metricsQB->orderBy($orderColumn, $direction);
             }
         }
 
-        if (!empty($args['fileTypes'])) {
-            $statsQB->filterByFileTypes(($args['fileTypes']));
+        if (isset($args['count'])) {
+            $metricsQB->limit($args['count']);
+            if (isset($args['offset'])) {
+                $metricsQB->offset($args['offset']);
+            }
         }
+        /*
+        $file = 'debug.txt';
+        $current = file_get_contents($file);
+        $current .= print_r("++++ get stats context service metrics qb: ++++\n", true);
+        $current .= print_r($metricsQB->toSql(), true);
+        $current .= print_r($metricsQB->getBindings(), true);
+        file_put_contents($file, $current);
+        */
+        //return $metricsQB;
 
-        \HookRegistry::call('Stats::queryBuilder', [&$statsQB, $args]);
+        return $metricsQB->get();
+        /*
+        $result = $metricsQB->get();
 
-        return $statsQB;
+        $file = 'debug.txt';
+        $current = file_get_contents($file);
+        $current .= print_r("++++ get stats service metrics result: ++++\n", true);
+        $current .= print_r($result, true);
+        file_put_contents($file, $current);
+        return $result;
+        */
     }
+
+    /**
+     * Get columns used by this service, to get the metrics.
+     *
+     */
+    abstract public function getStatsColumns(): array;
+
+    /**
+     * Prepare filters passed by the user to be used by this service.
+     */
+    abstract public function prepareStatsArgs(array $filters = []): array;
+
+    /**
+     * Get default parameters
+     *
+     */
+    abstract public function getDefaultArgs(): array;
+
+    /**
+     * Get a QueryBuilder object with the passed args
+     *
+     * See child classes for detailed parameter explanation.
+     *
+     *
+     */
+    abstract public function getQueryBuilder(array $args = []): \PKP\services\queryBuilders\PKPStatsQueryBuilder;
 }
