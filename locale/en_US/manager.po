@@ -2000,6 +2000,9 @@ msgstr "Category Details"
 msgid "stats.allUsers"
 msgstr "All Users"
 
+msgid "stats.city"
+msgstr "City"
+
 msgid "stats.countWithYearlyAverage"
 msgstr "{$count} ({$average}/year)"
 
@@ -2097,6 +2100,9 @@ msgstr "Monthly"
 msgid "stats.pdf"
 msgstr "PDF"
 
+msgid "stats.region"
+msgstr "Region"
+
 msgid "stats.searchSubmissionDescription"
 msgstr "Search by title, author and ID"
 
@@ -2106,11 +2112,26 @@ msgstr "Active Submissions"
 msgid "stats.total"
 msgstr "Total"
 
+msgid "stats.totalDownloads"
+msgstr "Total Downloads"
+
+msgid "stats.totalViews"
+msgstr "Total Views"
+
 msgid "stats.totalWithinDateRange"
 msgstr "Total Within Date Range"
 
 msgid "stats.trends"
 msgstr "Trends"
+
+msgid "stats.uniqueDownloads"
+msgstr "Unique Downloads"
+
+msgid "stats.uniqueViews"
+msgstr "Unique Views"
+
+msgid "stats.unknown"
+msgstr "unknown"
 
 msgid "stats.userStatistics"
 msgstr "User Statistics"
