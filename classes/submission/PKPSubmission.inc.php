@@ -26,8 +26,10 @@
 namespace PKP\submission;
 
 use APP\core\Application;
+use APP\core\Services;
 use APP\facades\Repo;
 use APP\i18n\AppLocale;
+use APP\statistics\StatisticsHelper;
 use Illuminate\Support\LazyCollection;
 use PKP\core\Core;
 use PKP\db\DAORegistry;
@@ -1474,12 +1476,28 @@ abstract class PKPSubmission extends \PKP\core\DataObject
     /**
      * Get views of the submission.
      *
+     * @deprecated 3.4
+     *
      * @return int
      */
     public function getViews()
     {
-        $application = Application::getApplication();
-        return $application->getPrimaryMetricByAssoc(ASSOC_TYPE_SUBMISSION, $this->getId());
+        $views = 0;
+        $filters = [
+            'dateStart' => StatisticsHelper::STATISTICS_EARLIEST_DATE,
+            'dateEnd' => date('Y-m-d', strtotime('yesterday')),
+            'contextIds' => [$this->getData('contextId')],
+            'submissionIds' => [$this->getId()],
+            'assocTypes' => [Application::ASSOC_TYPE_SUBMISSION],
+        ];
+        $metrics = Services::get('publicationStats')
+            ->getQueryBuilder($filters)
+            ->getSum([])
+            ->get()->toArray();
+        if (!empty($metrics)) {
+            $views = (int) current($metrics)->metric;
+        }
+        return $views;
     }
 
     /**
