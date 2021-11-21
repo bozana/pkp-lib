@@ -58,11 +58,22 @@ class migrationTool extends \PKP\cliTool\CommandLineTool
     }
 
     /**
+     * Log install message to stdout.
+     *
+     * @param $message string
+     */
+    public function log($message)
+    {
+        printf("[%s]\n", $message);
+    }
+
+    /**
      * Execute the specified migration.
      */
     public function execute()
     {
         $upgrade = new \APP\install\Upgrade([]);
+        $upgrade->setLogger($this);
         $migration = new $this->class($upgrade, []);
         try {
             $direction = $this->direction;
