@@ -17,9 +17,6 @@
 namespace PKP\statistics;
 
 use APP\core\Application;
-use PKP\core\PKPApplication;
-
-use PKP\plugins\PluginRegistry;
 
 abstract class PKPStatisticsHelper
 {
@@ -76,57 +73,6 @@ abstract class PKPStatisticsHelper
     }
 
     /**
-    * Check whether the filter filters on a context
-    * and if so: retrieve it.
-    *
-    * NB: We do not check filters below the context level as this would
-    * be unnecessarily complex. We'd have to check whether the given
-    * publication objects are actually from the same context. This again
-    * would require us to retrieve all context objects for the filtered
-    * objects, etc.
-    *
-    * @param $filter array
-    *
-    * @return null|Context
-    */
-    public function &getContext($filter)
-    {
-        // Check whether the report is on context level.
-        $context = null;
-        if (isset($filter[self::STATISTICS_DIMENSION_CONTEXT_ID])) {
-            $contextFilter = $filter[self::STATISTICS_DIMENSION_CONTEXT_ID];
-            if (is_scalar($contextFilter)) {
-                // Retrieve the context object.
-                $contextDao = Application::getContextDAO(); /** @var ContextDAO $contextDao */
-                $context = $contextDao->getById($contextFilter);
-            }
-        }
-        return $context;
-    }
-
-    /**
-    * Get report column name.
-    *
-    * @param $column string (optional)
-    *
-    * @return array|string|null
-    */
-    public function getColumnNames($column = null)
-    {
-        $columns = $this->getReportColumnsArray();
-
-        if ($column) {
-            if (isset($columns[$column])) {
-                return $columns[$column];
-            } else {
-                return null;
-            }
-        } else {
-            return $columns;
-        }
-    }
-
-    /**
     * Get object type string.
     *
     * @param $assocType mixed int or null (optional)
@@ -149,100 +95,6 @@ abstract class PKPStatisticsHelper
     }
 
     /**
-     * Get file type string.
-     *
-     * @param $fileType mixed int or null (optional)
-     *
-     * @return mixed string or array
-     */
-    public function getFileTypeString($fileType = null)
-    {
-        $fileTypeArray = $this->getFileTypesArray();
-
-        if (is_null($fileType)) {
-            return $fileTypeArray;
-        } else {
-            if (isset($fileTypeArray[$fileType])) {
-                return $fileTypeArray[$fileType];
-            } else {
-                assert(false);
-            }
-        }
-    }
-
-    /**
-     * Get an url that requests a statiscs report,
-     * using the passed parameters as request arguments.
-     *
-     * @param $request PKPRequest
-     * @param $metricType string Report metric type.
-     * @param $columns array Report columns
-     * @param $filter array Report filters.
-     * @param $orderBy array (optional) Report order by values.
-     *
-     * @return string
-     */
-    public function getReportUrl($request, $metricType, $columns, $filter, $orderBy = [])
-    {
-        $dispatcher = $request->getDispatcher(); /** @var Dispatcher $dispatcher */
-        $args = [
-            'columns' => $columns,
-            'filters' => json_encode($filter)
-        ];
-
-        if (!empty($orderBy)) {
-            $args['orderBy'] = json_encode($orderBy);
-        }
-
-        return $dispatcher->url($request, PKPApplication::ROUTE_PAGE, null, 'stats', 'reports', 'generateReport', $args);
-    }
-
-
-    /**
-    * Get the geo location tool.
-    *
-    * @return mixed GeoLocationTool object or null
-    */
-    public function &getGeoLocationTool()
-    {
-        $geoLocationTool = null;
-        $plugin = PluginRegistry::getPlugin('generic', 'usagestatsplugin'); /** @var UsageStatsPlugin $plugin */
-        if ($plugin) {
-            $geoLocationTool = $plugin->getGeoLocationTool();
-        }
-        return $geoLocationTool;
-    }
-
-
-    //
-    // Protected methods.
-    //
-    /**
-     * Get all statistics report columns, with their respective
-     * names as array values.
-     *
-     * @return array
-     */
-    protected function getReportColumnsArray()
-    {
-        return [
-            self::STATISTICS_DIMENSION_ASSOC_ID => __('common.id'),
-            self::STATISTICS_DIMENSION_ASSOC_TYPE => __('common.type'),
-            self::STATISTICS_DIMENSION_FILE_TYPE => __('common.fileType'),
-            self::STATISTICS_DIMENSION_FILE_ID => __('common.file'),
-            self::STATISTICS_DIMENSION_SUBMISSION_ID => $this->getAppColumnTitle(self::STATISTICS_DIMENSION_SUBMISSION_ID),
-            self::STATISTICS_DIMENSION_CONTEXT_ID => $this->getAppColumnTitle(self::STATISTICS_DIMENSION_CONTEXT_ID),
-            self::STATISTICS_DIMENSION_PKP_SECTION_ID => $this->getAppColumnTitle(self::STATISTICS_DIMENSION_PKP_SECTION_ID),
-            //self::STATISTICS_DIMENSION_CITY => __('manager.statistics.city'),
-            //self::STATISTICS_DIMENSION_REGION => __('manager.statistics.region'),
-            //self::STATISTICS_DIMENSION_COUNTRY => __('common.country'),
-            self::STATISTICS_DIMENSION_DAY => __('common.day'),
-            self::STATISTICS_DIMENSION_MONTH => __('common.month'),
-            self::STATISTICS_METRIC => __('common.count')
-        ];
-    }
-
-    /**
      * Get all statistics report public objects, with their
      * respective names as array values.
      *
@@ -254,31 +106,6 @@ abstract class PKPStatisticsHelper
             Application::ASSOC_TYPE_SUBMISSION_FILE => __('submission.submit.submissionFiles')
         ];
     }
-
-    /**
-     * Get all file types that have statistics, with
-     * their respective names as array values.
-     *
-     * @return array
-     */
-    public function getFileTypesArray()
-    {
-        return [
-            self::STATISTICS_FILE_TYPE_PDF => 'PDF',
-            self::STATISTICS_FILE_TYPE_HTML => 'HTML',
-            self::STATISTICS_FILE_TYPE_OTHER => __('common.other'),
-            self::STATISTICS_FILE_TYPE_DOC => 'DOC',
-        ];
-    }
-
-    /**
-     * Get an application specific column name.
-     *
-     * @param $column string One of the statistics column constant.
-     *
-     * @return string A localized text.
-     */
-    abstract protected function getAppColumnTitle($column);
 }
 
 if (!PKP_STRICT_MODE) {
