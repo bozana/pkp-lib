@@ -396,12 +396,6 @@ class PKPStatsHandler extends Handler
             case 'report':
                 $this->report($args, $request);
                 break;
-            case 'reportGenerator':
-                $this->reportGenerator($args, $request);
-                break;
-            case 'generateReport':
-                $this->generateReport($args, $request);
-                break;
             default: assert(false);
         }
     }
@@ -446,11 +440,6 @@ class PKPStatsHandler extends Handler
 
         $pluginName = $request->getUserVar('pluginName');
         $reportPlugins = PluginRegistry::loadCategory('reports');
-        $file = 'debug.txt';
-        $current = file_get_contents($file);
-        $current .= print_r("++++ reportPlugins ++++\n", true);
-        $current .= print_r($reportPlugins, true);
-        file_put_contents($file, $current);
 
         if ($pluginName == '' || !isset($reportPlugins[$pluginName])) {
             $request->redirect(null, null, 'stats', 'reports');
@@ -458,84 +447,6 @@ class PKPStatsHandler extends Handler
 
         $plugin = $reportPlugins[$pluginName];
         $plugin->display($args, $request);
-    }
-
-    /**
-     * Display page to generate custom reports.
-     *
-     * @param array $args
-     * @param Request $request
-     */
-    public function reportGenerator($args, $request)
-    {
-        $this->setupTemplate($request);
-        $templateMgr = TemplateManager::getManager($request);
-        $templateMgr->assign([
-            'breadcrumbs' => [
-                [
-                    'id' => 'reports',
-                    'name' => __('manager.statistics.reports'),
-                    'url' => $request->getRouter()->url($request, null, 'stats', 'reports'),
-                ],
-                [
-                    'id' => 'customReportGenerator',
-                    'name' => __('manager.statistics.reports.customReportGenerator')
-                ],
-            ],
-            'pageTitle' => __('manager.statistics.reports.customReportGenerator'),
-        ]);
-        $templateMgr->display('stats/reportGenerator.tpl');
-    }
-
-    /**
-     * Generate statistics reports from passed
-     * request arguments.
-     *
-     * @param array $args
-     * @param PKPRequest $request
-     */
-    public function generateReport($args, $request)
-    {
-        $this->setupTemplate($request);
-
-        $router = $request->getRouter();
-        $context = $router->getContext($request);
-
-        // Retrieve site-level report plugins.
-        $reportPlugin = PluginRegistry::loadPlugin('reports', 'usageStats', $context->getId());
-        if (!$reportPlugin) {
-            $request->redirect(null, 'stats', 'reports');
-        }
-
-        $file = 'debug.txt';
-        $current = file_get_contents($file);
-        $current .= print_r("++++ reportPlugin ++++\n", true);
-        $current .= print_r($reportPlugin, true);
-        file_put_contents($file, $current);
-
-        $columns = $request->getUserVar('columns');
-        $filters = (array) json_decode($request->getUserVar('filters'));
-        if (!$filters) {
-            $filters = $request->getUserVar('filters');
-        }
-
-        $orderBy = $request->getUserVar('orderBy');
-        if ($orderBy) {
-            $orderBy = (array) json_decode($orderBy);
-            if (!$orderBy) {
-                $orderBy = $request->getUserVar('orderBy');
-            }
-        } else {
-            $orderBy = [];
-        }
-        $file = 'debug.txt';
-        $current = file_get_contents($file);
-        $current .= print_r("++++ generate report get csv ++++\n", true);
-        $current .= print_r("++++ filters ++++\n", true);
-        $current .= print_r($filters, true);
-        file_put_contents($file, $current);
-
-        $reportPlugin->getCSV($request, $columns, $filters, $orderBy);
     }
 
     //
