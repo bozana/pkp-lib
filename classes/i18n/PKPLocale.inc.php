@@ -63,6 +63,7 @@ define('LOCALE_COMPONENT_PKP_DEFAULT', 0x00000009);
 define('LOCALE_COMPONENT_PKP_EDITOR', 0x0000000A);
 define('LOCALE_COMPONENT_PKP_REVIEWER', 0x0000000B);
 define('LOCALE_COMPONENT_PKP_API', 0x0000000C);
+define('LOCALE_COMPONENT_PKP_SUSHI', 0x0000000D);
 
 // Application-specific locale components
 define('LOCALE_COMPONENT_APP_COMMON', 0x00000100);
@@ -74,6 +75,7 @@ define('LOCALE_COMPONENT_APP_ADMIN', 0x00000105);
 define('LOCALE_COMPONENT_APP_DEFAULT', 0x00000106);
 define('LOCALE_COMPONENT_APP_API', 0x00000107);
 define('LOCALE_COMPONENT_APP_EMAIL', 0x00000108);
+define('LOCALE_COMPONENT_APP_SUSHI', 0x00000109);
 
 use PKP\session\SessionManager;
 
@@ -398,6 +400,7 @@ class PKPLocale
             LOCALE_COMPONENT_PKP_GRID => $baseDir . 'grid.po',
             LOCALE_COMPONENT_PKP_DEFAULT => $baseDir . 'default.po',
             LOCALE_COMPONENT_PKP_API => $baseDir . 'api.po',
+            LOCALE_COMPONENT_PKP_SUSHI => $baseDir . 'sushi.po',
         ];
     }
 
