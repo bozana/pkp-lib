@@ -23,7 +23,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\LazyCollection;
 use PKP\core\EntityDAO;
 use PKP\plugins\HookRegistry;
-use stdClass;
 
 class DAO extends EntityDAO
 {
@@ -139,7 +138,7 @@ class DAO extends EntityDAO
     /**
      * @copydoc EntityDAO::fromRow()
      */
-    public function fromRow(stdClass $row): Institution
+    public function fromRow(object $row): Institution
     {
         $institution = parent::fromRow($row);
 
