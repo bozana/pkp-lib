@@ -5,6 +5,7 @@ namespace PKP\observers\listeners;
 use APP\core\Application;
 use APP\facades\Repo;
 use APP\observers\events\UsageEvent;
+use APP\statistics\StatisticsHelper;
 use GeoIp2\Database\Reader;
 
 use PKP\cache\CacheManager;
@@ -155,18 +156,20 @@ class PKPUsageEventLogListener
     /**
      * Get the usage stats directory path.
      */
+    /*
     public function getUsageStatsDirPath(): string
     {
         $fileMgr = new PrivateFileManager();
         return realpath($fileMgr->getBasePath()) . DIRECTORY_SEPARATOR . 'usageStats';
     }
+    */
 
     /**
      * Get the path to the Geo DB file.
      */
     public function getGeoDBPath(): string
     {
-        return $this->getUsageStatsDirPath() . DIRECTORY_SEPARATOR . 'IPGeoDB.mmdb';
+        return StatisticsHelper::getUsageStatsDirPath() . DIRECTORY_SEPARATOR . 'IPGeoDB.mmdb';
     }
 
     /**
@@ -174,7 +177,7 @@ class PKPUsageEventLogListener
      */
     public function getSaltFileName(): string
     {
-        return $this->getUsageStatsDirPath() . DIRECTORY_SEPARATOR . 'salt';
+        return StatisticsHelper::getUsageStatsDirPath() . DIRECTORY_SEPARATOR . 'salt';
     }
 
     /**
@@ -182,7 +185,7 @@ class PKPUsageEventLogListener
      */
     public function getUsageEventLogFileName(): string
     {
-        $usageEventLogsDir = $this->getUsageStatsDirPath() . DIRECTORY_SEPARATOR . 'usageEventLogs';
+        $usageEventLogsDir = StatisticsHelper::getUsageStatsDirPath() . DIRECTORY_SEPARATOR . 'usageEventLogs';
         // create the directory at the installation, together with the usageStats dir?
         if (!file_exists($usageEventLogsDir) || !is_dir($usageEventLogsDir)) {
             $fileMgr = new PrivateFileManager();
