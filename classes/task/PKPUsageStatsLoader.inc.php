@@ -16,19 +16,19 @@
 namespace PKP\task;
 
 use APP\core\Application;
+use APP\core\Services;
+use APP\Jobs\Statistics\LoadMetricsDataJob;
+use APP\Jobs\Statistics\LoadMonthlyMetricsDataJob;
+use APP\statistics\StatisticsHelper;
+use PKP\core\Core;
 use PKP\file\FileManager;
-use PKP\file\PrivateFileManager;
 use PKP\scheduledTask\ScheduledTaskHelper;
 
 abstract class PKPUsageStatsLoader extends FileLoader
 {
-    /** These are rules defined by the COUNTER project.
-     * See https://www.projectcounter.org/code-of-practice-five-sections/7-processing-rules-underlying-counter-reporting-data/#doubleclick
-     */
-    public const COUNTER_DOUBLE_CLICK_TIME_FILTER_SECONDS = 30;
-
     /** @var string $_autoStage */
     public $_autoStage;
+    public array $months = [];
 
     /**
      * Constructor.
@@ -42,7 +42,7 @@ abstract class PKPUsageStatsLoader extends FileLoader
         $this->_autoStage = true;
 
         // Define the base filesystem path.
-        $basePath = $this->getUsageStatsDirPath();
+        $basePath = StatisticsHelper::getUsageStatsDirPath();
         $args[0] = $basePath;
         parent::__construct($args);
 
@@ -75,7 +75,134 @@ abstract class PKPUsageStatsLoader extends FileLoader
         if ($this->_autoStage) {
             $this->autoStage();
         }
-        return (parent::executeActions() && !$processingDirError);
+        $processFilesResult = parent::executeActions();
+        $file = 'debug.txt';
+        $current = file_get_contents($file);
+        $current .= print_r("++++ months ++++\n", true);
+        $current .= print_r($this->months, true);
+        file_put_contents($file, $current);
+        foreach ($this->months as $month) {
+            dispatch(new LoadMonthlyMetricsDataJob($month));
+        }
+        return ($processFilesResult && !$processingDirError);
+    }
+
+    abstract protected function deleteByLoadId(string $loadId);
+    abstract protected function insertTemporaryUsageStatsData(\stdClass $entry, int $lineNumber, string $loadId);
+    abstract protected function checkForeignKeys(\stdClass $entry): array;
+    abstract protected function isLogEntryValid(\stdClass $entry);
+
+    /**
+     * @copydoc FileLoader::processFile()
+     * The file's entries MUST be ordered by date-time to successfully identify double-clicks and unique items.
+     */
+    protected function processFile(string $filePath)
+    {
+        $fhandle = fopen($filePath, 'r');
+        if (!$fhandle) {
+            // TO-DO: move plugins.generic.usageStats.openFileFailed to usageStats.openFileFailed
+            throw new \Exception(__('usageStats.openFileFailed', ['file' => $filePath]));
+        }
+
+        $loadId = basename($filePath);
+        $logFileDate = substr($loadId, -12, 8);
+        $month = substr($loadId, -12, 6);
+        // TO-DO: if $site->getData('usageStatsKeepDaily') == 0
+        // check if the month is already processed
+        // currently only the table metrics_counter_submission_monthly will be considered
+        // TO-DO: once we decided how the log files in the old format should be reprocessed
+        // this should eventually be adapted, because the metrics_submission_geo_monthly could contain also earlier months
+        $statsService = Services::get('sushiStats');
+        $monthExists = $statsService->monthExists($month);
+        $dateR5Installed = date('Ymd', strtotime($statsService->getEarliestDate()));
+        if ($logFileDate < $dateR5Installed) {
+            // the log file is in old log file format
+            // return the file to staging and
+            // log the error
+            // TO-DO: once we decided how the log files in the old format should be reprocessed, this might change
+            $this->addExecutionLogEntry(__(
+                'usageStats.logfileProcessing.veryOldLogFile',
+                ['file' => $filePath]
+            ), ScheduledTaskHelper::SCHEDULED_TASK_MESSAGE_TYPE_ERROR);
+            return FileLoader::FILE_LOADER_RETURN_TO_STAGING;
+        }
+        if ($monthExists) {
+            // the month is already processed
+            // return the file to staging and
+            // log the error that a script for reprocessing should be called for the whole month
+            $this->addExecutionLogEntry(__(
+                'usageStats..logfileProcessing.monthProcessed',
+                ['file' => $filePath]
+            ), ScheduledTaskHelper::SCHEDULED_TASK_MESSAGE_TYPE_ERROR);
+            return FileLoader::FILE_LOADER_RETURN_TO_STAGING;
+        }
+        if (!in_array($month, $this->months)) {
+            $this->months[] = $month;
+        }
+
+        // Make sure we don't have any temporary records associated
+        // with the current load id in database.
+        $this->deleteByLoadId($loadId);
+
+        $lineNumber = 0;
+        while (!feof($fhandle)) {
+            $lineNumber++;
+            $line = trim(fgets($fhandle));
+            if (empty($line) || substr($line, 0, 1) === '#') {
+                continue;
+            } // Spacing or comment lines. Should not occur in the new format.
+
+            // Regex to parse this usageStats plugin's log access files.
+            $parseRegex = '/^(?P<ip>\S+) \S+ \S+ "(?P<date>.*?)" (?P<url>\S+) (?P<returnCode>\S+) "(?P<userAgent>.*?)"/';
+            if (preg_match($parseRegex, $line, $m)) {
+                // This is a line in the old logfile format
+                $this->addExecutionLogEntry(__('usageStats.logfileProcessing.oldLogfileFormat', ['loadId' => $loadId, 'lineNumber' => $lineNumber]), ScheduledTaskHelper::SCHEDULED_TASK_MESSAGE_TYPE_ERROR);
+            } else {
+                $entryData = json_decode($line);
+            }
+
+            try {
+                $this->isLogEntryValid($entryData);
+            } catch (\Exception $e) {
+                // reject the file ???
+                throw new \Exception(__(
+                    'usageStats.invalidLogEntry',
+                    ['file' => $filePath, 'lineNumber' => $lineNumber, 'error' => $e->getMessage()]
+                ));
+            }
+
+            // Avoid bots.
+            if (Core::isUserAgentBot($entryData->userAgent)) {
+                continue;
+            }
+
+            $foreignKeyErrors = $this->checkForeignKeys($entryData);
+            if (!empty($foreignKeyErrors)) {
+                $missingForeignKeys = implode(', ', $foreignKeyErrors);
+                $this->addExecutionLogEntry(__('usageStats.logfileProcessing.foreignKeyError', ['missingForeignKeys' => $missingForeignKeys, 'loadId' => $loadId, 'lineNumber' => $lineNumber]), ScheduledTaskHelper::SCHEDULED_TASK_MESSAGE_TYPE_ERROR);
+                $file = 'debug.txt';
+                $current = file_get_contents($file);
+                $current .= print_r("++++ missingForeignKeys ++++\n", true);
+                $current .= print_r($missingForeignKeys, true);
+                $current .= print_r("++++ loadId ++++\n", true);
+                $current .= print_r($loadId, true);
+                $current .= print_r("++++ lineNumber ++++\n", true);
+                $current .= print_r($lineNumber, true);
+                file_put_contents($file, $current);
+            } else {
+                $this->insertTemporaryUsageStatsData($entryData, $lineNumber, $loadId);
+            }
+        }
+        fclose($fhandle);
+
+        dispatch(new LoadMetricsDataJob($loadId));
+        // TO-DO: add locale key:
+        $this->addExecutionLogEntry(__(
+            'usageStats.loadMetricsData.jobDispatched',
+            ['file' => $filePath]
+        ), ScheduledTaskHelper::SCHEDULED_TASK_MESSAGE_TYPE_NOTICE);
+
+        return true;
     }
 
     /**
@@ -88,14 +215,13 @@ abstract class PKPUsageStatsLoader extends FileLoader
         $fileMgr = new FileManager();
         $logFiles = [];
         $logsDirFiles = glob($this->getUsageEventLogsPath() . DIRECTORY_SEPARATOR . '*');
+        if (is_array($logsDirFiles)) {
+            $logFiles = array_merge($logFiles, $logsDirFiles);
+        }
         // It's possible that the processing directory have files that
         // were being processed but the php process was stopped before
         // finishing the processing. Just copy them to the stage directory too.
         $processingDirFiles = glob($this->getProcessingPath() . DIRECTORY_SEPARATOR . '*');
-        if (is_array($logsDirFiles)) {
-            $logFiles = array_merge($logFiles, $logsDirFiles);
-        }
-
         if (is_array($processingDirFiles)) {
             $logFiles = array_merge($logFiles, $processingDirFiles);
         }
@@ -115,20 +241,11 @@ abstract class PKPUsageStatsLoader extends FileLoader
     }
 
     /**
-     * Get the usage stats directory path.
-     */
-    public function getUsageStatsDirPath(): string
-    {
-        $fileMgr = new PrivateFileManager();
-        return realpath($fileMgr->getBasePath()) . DIRECTORY_SEPARATOR . 'usageStatsBB';
-    }
-
-    /**
      * Get the usage event logs directory path.
      */
     public function getUsageEventLogsPath(): string
     {
-        return $this->getUsageStatsDirPath() . DIRECTORY_SEPARATOR . 'usageEventLogs';
+        return StatisticsHelper::getUsageStatsDirPath() . DIRECTORY_SEPARATOR . 'usageEventLogs';
     }
 
     /**
