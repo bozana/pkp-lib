@@ -561,22 +561,13 @@ msgid "manager.settings.statistics.archivedUsageStatsLogFiles.compress"
 msgstr "Compress archives"
 
 msgid "manager.settings.statistics.keepDaily"
-msgstr "Daily COUNTER {$object} metrics"
-
-msgid "manager.settings.statistics.keepDaily.submission"
-msgstr "submission"
-
-msgid "manager.settings.statistics.keepDaily.geo"
-msgstr "Geo"
-
-msgid "manager.settings.statistics.keepDaily.institution"
-msgstr "institution"
+msgstr "Daily metrics"
 
 msgid "manager.settings.statistics.keepDaily.description"
-msgstr "The COUNTER {$object} usage statistics are summarized per month. After that the daily records are deleted. Select this option if you would like to keep the daily records in the database. Be aware that this will significantly increase your database."
+msgstr "The COUNTER and Geo usage statistics are summarized per month. After that the daily records are deleted. Select this option if you would like to keep the daily records in the database. Be aware that this will significantly increase your database."
 
 msgid "manager.settings.statistics.keepDaily.option"
-msgstr "Keep the COUNTER {$object} daily metrics in the database"
+msgstr "Keep the daily metrics in the database"
 
 msgid "manager.settings.statistics.geoUsageStats"
 msgstr "Geo usage statistics"
