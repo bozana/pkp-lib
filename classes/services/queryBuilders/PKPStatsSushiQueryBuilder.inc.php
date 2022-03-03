@@ -162,4 +162,16 @@ class PKPStatsSushiQueryBuilder extends PKPStatsQueryBuilder
 
         return $q;
     }
+
+    /**
+     * Do usage stats data already exist for the given month
+     * Consider only the table metrics_counter_submission_monthly, because
+     * if it will have an entry -- metrics_counter_submission_institution_monthly could
+     * not contain data.
+     */
+    public function monthExists(string $month): bool
+    {
+        return DB::table('metrics_counter_submission_monthly as m')
+            ->where(StatisticsHelper::STATISTICS_DIMENSION_MONTH, $month)->exists();
+    }
 }

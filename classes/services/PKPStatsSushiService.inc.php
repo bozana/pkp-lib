@@ -15,6 +15,8 @@
 
 namespace PKP\services;
 
+use APP\core\Application;
+use Illuminate\Support\Facades\DB;
 use PKP\plugins\HookRegistry;
 
 class PKPStatsSushiService
@@ -41,5 +43,33 @@ class PKPStatsSushiService
         HookRegistry::call('StatsSushi::queryBuilder', [&$statsQB, $args]);
 
         return $statsQB;
+    }
+
+    /**
+     * Do usage stats data already exist for the given month
+     */
+    public function monthExists(string $month): bool
+    {
+        $statsQB = new \PKP\services\queryBuilders\PKPStatsSushiQueryBuilder();
+        return $statsQB->monthExists($month);
+    }
+
+    /**
+     * Get earliest date, the COUNTER R5 started at
+     * R5 is introduced in the release 3.4.0.0, so get the date installed of the release 3.4.0.0 or first next used release
+     */
+    public function getEarliestDate(): string
+    {
+        $product = Application::get()->getName();
+        $dateInstalledArray = DB::select("
+            SELECT date_installed
+                FROM versions
+                WHERE major*1000+minor*100+revision*10+build IN
+                    (SELECT MIN(major*1000+minor*100+revision*10+build)
+                    FROM versions vt
+                    WHERE vt.product_type = 'core' AND vt.product = ? AND vt.major*1000+vt.minor*100+vt.revision*10+vt.build >= 3400)
+                AND product_type = 'core' AND product = ?
+        ", [$product, $product]);
+        return current($dateInstalledArray)->date_installed;
     }
 }
