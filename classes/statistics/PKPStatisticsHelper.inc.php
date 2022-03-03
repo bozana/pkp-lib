@@ -17,6 +17,7 @@
 namespace PKP\statistics;
 
 use APP\core\Application;
+use PKP\file\PrivateFileManager;
 
 abstract class PKPStatisticsHelper
 {
@@ -66,6 +67,11 @@ abstract class PKPStatisticsHelper
     // Set the earliest date used
     public const STATISTICS_EARLIEST_DATE = '2001-01-01';
 
+    /** These are rules defined by the COUNTER project.
+     * See https://www.projectcounter.org/code-of-practice-five-sections/7-processing-rules-underlying-counter-reporting-data/#doubleclick
+     */
+    public const COUNTER_DOUBLE_CLICK_TIME_FILTER_SECONDS = 30;
+
 
     /**
     * Get object type string.
@@ -100,6 +106,15 @@ abstract class PKPStatisticsHelper
         return [
             Application::ASSOC_TYPE_SUBMISSION_FILE => __('submission.submit.submissionFiles')
         ];
+    }
+
+    /**
+     * Get the usage stats directory path.
+     */
+    public static function getUsageStatsDirPath(): string
+    {
+        $fileMgr = new PrivateFileManager();
+        return realpath($fileMgr->getBasePath()) . DIRECTORY_SEPARATOR . 'usageStatsBB';
     }
 }
 
