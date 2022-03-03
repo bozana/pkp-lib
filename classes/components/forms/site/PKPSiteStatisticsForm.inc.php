@@ -15,7 +15,6 @@
 namespace PKP\components\forms\site;
 
 use PKP\components\forms\FieldOptions;
-use PKP\components\forms\FieldSelect;
 use PKP\components\forms\FieldText;
 use PKP\components\forms\FormComponent;
 
@@ -62,22 +61,6 @@ class PKPSiteStatisticsForm extends FormComponent
                 'value' => $site->getData('archivedUsageStatsLogFiles') ? $site->getData('archivedUsageStatsLogFiles') : 0,
             ]))
             ->addGroup([
-                'id' => 'submission',
-            ])
-            ->addField(new FieldOptions('submissionUsageStatsKeepDaily', [
-                'label' => __('manager.settings.statistics.keepDaily', ['object' => __('manager.settings.statistics.keepDaily.submission')]),
-                'description' => __('manager.settings.statistics.keepDaily.description', ['object' => __('manager.settings.statistics.keepDaily.submission')]),
-                'groupId' => 'submission',
-                'options' => [
-                    [
-                        'value' => true,
-                        'label' => __('manager.settings.statistics.keepDaily.option', ['object' => __('manager.settings.statistics.keepDaily.submission')]),
-                    ],
-                ],
-                'default' => false,
-                'value' => $site->getData('submissionUsageStatsKeepDaily'),
-            ]))
-            ->addGroup([
                 'id' => 'geo',
             ])
             ->addField(new FieldOptions('enableGeoUsageStats', [
@@ -105,20 +88,6 @@ class PKPSiteStatisticsForm extends FormComponent
                 ],
                 'value' => $site->getData('enableGeoUsageStats') ? $site->getData('enableGeoUsageStats') : 0,
             ]))
-            ->addField(new FieldOptions('geoUsageStatsKeepDaily', [
-                'label' => __('manager.settings.statistics.keepDaily', ['object' => __('manager.settings.statistics.keepDaily.geo')]),
-                'description' => __('manager.settings.statistics.keepDaily.description', ['object' => __('manager.settings.statistics.keepDaily.geo')]),
-                'groupId' => 'geo',
-                'options' => [
-                    [
-                        'value' => true,
-                        'label' => __('manager.settings.statistics.keepDaily.option', ['object' => __('manager.settings.statistics.keepDaily.geo')]),
-                    ],
-                ],
-                'default' => false,
-                'value' => $site->getData('geoUsageStatsKeepDaily'),
-                'showWhen' => 'enableGeoUsageStats',
-            ]))
             ->addGroup([
                 'id' => 'institution',
             ])
@@ -135,19 +104,21 @@ class PKPSiteStatisticsForm extends FormComponent
                 'default' => false,
                 'value' => $site->getData('enableInstitutionUsageStats'),
             ]))
-            ->addField(new FieldOptions('institutionUsageStatsKeepDaily', [
-                'label' => __('manager.settings.statistics.keepDaily', ['object' => __('manager.settings.statistics.keepDaily.institution')]),
-                'description' => __('manager.settings.statistics.keepDaily.description', ['object' => __('manager.settings.statistics.keepDaily.institution')]),
-                'groupId' => 'institution',
+            ->addGroup([
+                'id' => 'keepDaily',
+            ])
+            ->addField(new FieldOptions('usageStatsKeepDaily', [
+                'label' => __('manager.settings.statistics.keepDaily'),
+                'description' => __('manager.settings.statistics.keepDaily.description'),
+                'groupId' => 'keepDaily',
                 'options' => [
                     [
                         'value' => true,
-                        'label' => __('manager.settings.statistics.keepDaily.option', ['object' => __('manager.settings.statistics.keepDaily.institution')]),
+                        'label' => __('manager.settings.statistics.keepDaily.option'),
                     ],
                 ],
                 'default' => false,
-                'value' => $site->getData('institutionUsageStatsKeepDaily'),
-                'showWhen' => 'enableInstitutionUsageStats',
+                'value' => $site->getData('usageStatsKeepDaily'),
             ]));
     }
 }
