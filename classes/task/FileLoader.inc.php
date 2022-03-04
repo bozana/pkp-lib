@@ -21,7 +21,6 @@ use Exception;
 use PKP\config\Config;
 use PKP\db\DAORegistry;
 use PKP\file\FileManager;
-use PKP\mail\Mail;
 use PKP\scheduledTask\ScheduledTask;
 
 use PKP\scheduledTask\ScheduledTaskHelper;
@@ -66,6 +65,9 @@ abstract class FileLoader extends ScheduledTask
 
     /** @var bool Whether to compress the archived files or not. */
     private $_compressArchives = false;
+
+    private array $_onlyConsiderFiles = [];
+
 
     /**
      * Constructor.
@@ -172,6 +174,15 @@ abstract class FileLoader extends ScheduledTask
         $this->_compressArchives = $compressArchives;
     }
 
+    /**
+     * Set the files that should only be considered.
+     *
+     * @param array $onlyConsiderFiles
+     */
+    public function setOnlyConsiderFiles($onlyConsiderFiles)
+    {
+        $this->_onlyConsiderFiles = $onlyConsiderFiles;
+    }
 
     //
     // Public methods
@@ -212,7 +223,7 @@ abstract class FileLoader extends ScheduledTask
                 $this->_archiveFile();
             }
 
-            if ($result) {
+            if ($result === true) {
                 $this->addExecutionLogEntry(__(
                     'admin.fileLoader.fileProcessed',
                     ['filename' => $filePath]
@@ -285,7 +296,6 @@ abstract class FileLoader extends ScheduledTask
     /**
      * Process the passed file.
      *
-     * @param string $filePath
      *
      * @see FileLoader::execute to understand
      * the expected return values.
@@ -295,9 +305,6 @@ abstract class FileLoader extends ScheduledTask
     /**
      * Move file between filesystem directories.
      *
-     * @param string $sourceDir
-     * @param string $destDir
-     * @param string $filename
      *
      * @return string The destination path of the moved file.
      */
@@ -335,7 +342,8 @@ abstract class FileLoader extends ScheduledTask
 
         while ($filename = readdir($stageDir)) {
             if ($filename == '..' || $filename == '.' ||
-                in_array($filename, $this->_stagedBackFiles)) {
+                in_array($filename, $this->_stagedBackFiles) ||
+                (!empty($this->_onlyConsiderFiles) && !in_array($filename, $this->_onlyConsiderFiles))) {
                 continue;
             }
 
