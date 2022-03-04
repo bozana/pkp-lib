@@ -15,10 +15,10 @@
 
 namespace PKP\task;
 
+use Exception;
 use PKP\config\Config;
 use PKP\db\DAORegistry;
 use PKP\file\FileManager;
-use PKP\mail\Mail;
 use PKP\scheduledTask\ScheduledTask;
 
 use PKP\scheduledTask\ScheduledTaskHelper;
@@ -64,12 +64,15 @@ abstract class FileLoader extends ScheduledTask
     /** @var bool Whether to compress the archived files or not. */
     private $_compressArchives = false;
 
+    private array $_onlyConsiderFiles = [];
+
+
     /**
      * Constructor.
      *
      * @param array $args script arguments
      */
-    public function __construct($args)
+    public function __construct(array $args)
     {
         parent::__construct($args);
 
@@ -82,16 +85,16 @@ abstract class FileLoader extends ScheduledTask
         if ($basePathParent === false) {
             $basePath = null;
         } else {
-            $basePath = "$basePathParent/$basePathFolder";
+            $basePath = "${basePathParent}/${basePathFolder}";
         }
         $this->_basePath = $basePath;
 
         // Configure paths.
         if (!is_null($basePath)) {
-            $this->_stagePath = "$basePath/" . FILE_LOADER_PATH_STAGING;
-            $this->_archivePath = "$basePath/" . FILE_LOADER_PATH_ARCHIVE;
-            $this->_rejectPath = "$basePath/" . FILE_LOADER_PATH_REJECT;
-            $this->_processingPath = "$basePath/" . FILE_LOADER_PATH_PROCESSING;
+            $this->_stagePath = "${basePath}/" . self::FILE_LOADER_PATH_STAGING;
+            $this->_archivePath = "${basePath}/" . self::FILE_LOADER_PATH_ARCHIVE;
+            $this->_rejectPath = "${basePath}/" . self::FILE_LOADER_PATH_REJECT;
+            $this->_processingPath = "${basePath}/" . self::FILE_LOADER_PATH_PROCESSING;
         }
 
         // Set admin email and name.
@@ -107,64 +110,59 @@ abstract class FileLoader extends ScheduledTask
     //
     /**
      * Return the staging path.
-     *
-     * @return string
      */
-    public function getStagePath()
+    public function getStagePath(): string
     {
         return $this->_stagePath;
     }
 
     /**
      * Return the processing path.
-     *
-     * @return string
      */
-    public function getProcessingPath()
+    public function getProcessingPath(): string
     {
         return $this->_processingPath;
     }
 
     /**
      * Return the reject path.
-     *
-     * @return string
      */
-    public function getRejectPath()
+    public function getRejectPath(): string
     {
         return $this->_rejectPath;
     }
 
     /**
      * Return the archive path.
-     *
-     * @return string
      */
-    public function getArchivePath()
+    public function getArchivePath(): string
     {
         return $this->_archivePath;
     }
 
     /**
      * Return whether the archives must be compressed or not.
-     *
-     * @return bool
      */
-    public function getCompressArchives()
+    public function getCompressArchives(): bool
     {
         return $this->_compressArchives;
     }
 
     /**
      * Set whether the archives must be compressed or not.
-     *
-     * @param bool $compressArchives
      */
-    public function setCompressArchives($compressArchives)
+    public function setCompressArchives(bool $compressArchives)
     {
         $this->_compressArchives = $compressArchives;
     }
 
+    /**
+     * Set the files that should only be considered.
+     */
+    public function setOnlyConsiderFiles(array $onlyConsiderFiles)
+    {
+        $this->_onlyConsiderFiles = $onlyConsiderFiles;
+    }
 
     //
     // Public methods
@@ -194,7 +192,8 @@ abstract class FileLoader extends ScheduledTask
                 continue;
             }
 
-            if ($result === FILE_LOADER_RETURN_TO_STAGING) {
+            if ($result === self::FILE_LOADER_RETURN_TO_STAGING) {
+                // Send the file back to staging
                 $foundErrors = true;
                 $this->_stageFile();
                 // Let the script know what files were sent back to staging,
@@ -204,7 +203,7 @@ abstract class FileLoader extends ScheduledTask
                 $this->_archiveFile();
             }
 
-            if ($result) {
+            if ($result === true) {
                 $this->addExecutionLogEntry(__(
                     'admin.fileLoader.fileProcessed',
                     ['filename' => $filePath]
@@ -224,7 +223,7 @@ abstract class FileLoader extends ScheduledTask
      * @return bool True if the folder structure exists,
      *  otherwise false.
      */
-    public function checkFolderStructure($install = false)
+    public function checkFolderStructure(bool $install = false): bool
     {
         // Make sure that the base path is inside the private files dir.
         // The files dir has appropriate write permissions and is assumed
@@ -277,26 +276,20 @@ abstract class FileLoader extends ScheduledTask
     /**
      * Process the passed file.
      *
-     * @param string $filePath
-     *
      * @see FileLoader::execute to understand
      * the expected return values.
      */
-    abstract protected function processFile($filePath);
+    abstract protected function processFile(string $filePath);
 
     /**
      * Move file between filesystem directories.
      *
-     * @param string $sourceDir
-     * @param string $destDir
-     * @param string $filename
-     *
      * @return string The destination path of the moved file.
      */
-    protected function moveFile($sourceDir, $destDir, $filename)
+    protected function moveFile(string $sourceDir, string $destDir, string $filename): string
     {
-        $currentFilePath = "$sourceDir/$filename";
-        $destinationPath = "$destDir/$filename";
+        $currentFilePath = "${sourceDir}/${filename}";
+        $destinationPath = "${destDir}/${filename}";
 
         if (!rename($currentFilePath, $destinationPath)) {
             $message = __('admin.fileLoader.moveFileFailed', ['filename' => $filename,
@@ -327,7 +320,8 @@ abstract class FileLoader extends ScheduledTask
 
         while ($filename = readdir($stageDir)) {
             if ($filename == '..' || $filename == '.' ||
-                in_array($filename, $this->_stagedBackFiles)) {
+                in_array($filename, $this->_stagedBackFiles) ||
+                (!empty($this->_onlyConsiderFiles) && !in_array($filename, $this->_onlyConsiderFiles))) {
                 continue;
             }
 
@@ -338,7 +332,7 @@ abstract class FileLoader extends ScheduledTask
         if (pathinfo($processingFilePath, PATHINFO_EXTENSION) == 'gz') {
             $fileMgr = new FileManager();
             try {
-                $processingFilePath = $fileMgr->decompressFile($processingFilePath);
+                $processingFilePath = $fileMgr->gzDecompressFile($processingFilePath);
                 $filename = pathinfo($processingFilePath, PATHINFO_BASENAME);
             } catch (Exception $e) {
                 $this->moveFile($this->_processingPath, $this->_stagePath, $filename);
@@ -373,7 +367,7 @@ abstract class FileLoader extends ScheduledTask
             try {
                 $fileMgr = new FileManager();
                 $filePath = "{$this->_archivePath}/{$this->_claimedFilename}";
-                $fileMgr->compressFile($filePath);
+                $fileMgr->gzCompressFile($filePath);
             } catch (Exception $e) {
                 $this->addExecutionLogEntry($e->getMessage(), ScheduledTaskHelper::SCHEDULED_TASK_MESSAGE_TYPE_ERROR);
             }
