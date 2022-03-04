@@ -35,11 +35,29 @@ abstract class PKPUsageStatsLoader extends FileLoader
      */
     public function __construct($args)
     {
+        $this->_autoStage = true;
+
+        $file = 'debug.txt';
+        $current = file_get_contents($file);
+        $current .= print_r("++++ PKPUsageStatsLoader args ++++\n", true);
+        $current .= print_r($args, true);
+        file_put_contents($file, $current);
+        if (!empty($args)) {
+            $reprocessMonth = current($args);
+            $reprocessFiles = $this->getStagedFilesByMonth($reprocessMonth);
+            $file = 'debug.txt';
+            $current = file_get_contents($file);
+            $current .= print_r("++++ reprocessFiles ++++\n", true);
+            $current .= print_r($reprocessFiles, true);
+            file_put_contents($file, $current);
+            $this->setOnlyConsiderFiles($reprocessFiles);
+            $this->_autoStage = false;
+        }
+
         $site = Application::get()->getRequest()->getSite();
         if ($site->getData('archivedUsageStatsLogFiles') == 1) {
             $this->setCompressArchives(true);
         }
-        $this->_autoStage = true;
 
         // Define the base filesystem path.
         $basePath = StatisticsHelper::getUsageStatsDirPath();
@@ -98,6 +116,12 @@ abstract class PKPUsageStatsLoader extends FileLoader
      */
     protected function processFile(string $filePath)
     {
+        $file = 'debug.txt';
+        $current = file_get_contents($file);
+        $current .= print_r("++++ processFile filePath ++++\n", true);
+        $current .= print_r($filePath, true);
+        file_put_contents($file, $current);
+
         $fhandle = fopen($filePath, 'r');
         if (!$fhandle) {
             // TO-DO: move plugins.generic.usageStats.openFileFailed to usageStats.openFileFailed
@@ -107,14 +131,11 @@ abstract class PKPUsageStatsLoader extends FileLoader
         $loadId = basename($filePath);
         $logFileDate = substr($loadId, -12, 8);
         $month = substr($loadId, -12, 6);
-        // TO-DO: if $site->getData('usageStatsKeepDaily') == 0
-        // check if the month is already processed
-        // currently only the table metrics_counter_submission_monthly will be considered
-        // TO-DO: once we decided how the log files in the old format should be reprocessed
-        // this should eventually be adapted, because the metrics_submission_geo_monthly could contain also earlier months
+        $currentMonth = date('Ym');
+
         $statsService = Services::get('sushiStats');
-        $monthExists = $statsService->monthExists($month);
         $dateR5Installed = date('Ymd', strtotime($statsService->getEarliestDate()));
+        $dateR5Installed = '20000101';
         if ($logFileDate < $dateR5Installed) {
             // the log file is in old log file format
             // return the file to staging and
@@ -124,18 +145,29 @@ abstract class PKPUsageStatsLoader extends FileLoader
                 'usageStats.logfileProcessing.veryOldLogFile',
                 ['file' => $filePath]
             ), ScheduledTaskHelper::SCHEDULED_TASK_MESSAGE_TYPE_ERROR);
-            return FileLoader::FILE_LOADER_RETURN_TO_STAGING;
+            return self::FILE_LOADER_RETURN_TO_STAGING;
         }
-        if ($monthExists) {
-            // the month is already processed
-            // return the file to staging and
-            // log the error that a script for reprocessing should be called for the whole month
-            $this->addExecutionLogEntry(__(
-                'usageStats..logfileProcessing.monthProcessed',
-                ['file' => $filePath]
-            ), ScheduledTaskHelper::SCHEDULED_TASK_MESSAGE_TYPE_ERROR);
-            return FileLoader::FILE_LOADER_RETURN_TO_STAGING;
+
+        $site = Application::get()->getRequest()->getSite();
+        // if the daily metrics are not kept, and this is not the current month (which is kept in the DB)
+        if (!$site->getData('usageStatsKeepDaily') && $month != $currentMonth) {
+            // check if the month is already processed
+            // currently only the table metrics_counter_submission_monthly will be considered
+            // TO-DO: once we decided how the log files in the old format should be reprocessed
+            // this should eventually be adapted, because the metrics_submission_geo_monthly could contain also earlier months
+            $monthExists = $statsService->monthExists($month);
+            if ($monthExists) {
+                // the month is already processed
+                // return the file to staging and
+                // log the error that a script for reprocessing should be called for the whole month
+                $this->addExecutionLogEntry(__(
+                    'usageStats.logfileProcessing.monthProcessed',
+                    ['file' => $filePath]
+                ), ScheduledTaskHelper::SCHEDULED_TASK_MESSAGE_TYPE_ERROR);
+                return self::FILE_LOADER_RETURN_TO_STAGING;
+            }
         }
+
         if (!in_array($month, $this->months)) {
             $this->months[] = $month;
         }
@@ -238,6 +270,22 @@ abstract class PKPUsageStatsLoader extends FileLoader
                 $this->moveFile(pathinfo($filePath, PATHINFO_DIRNAME), $this->getStagePath(), $filename);
             }
         }
+    }
+
+    /**
+     * Get staged usage log files belonging to a month, that should be reprocessed
+     */
+    protected function getStagedFilesByMonth(string $month): array
+    {
+        $filesToConsider = [];
+        $stagePath = StatisticsHelper::getUsageStatsDirPath() . DIRECTORY_SEPARATOR . self::FILE_LOADER_PATH_STAGING;
+        $stageDir = opendir($stagePath);
+        while ($filename = readdir($stageDir)) {
+            if (str_starts_with($filename, 'usage_events_BB_' . $month)) {
+                $filesToConsider[] = $filename;
+            }
+        }
+        return $filesToConsider;
     }
 
     /**
