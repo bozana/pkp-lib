@@ -76,7 +76,8 @@
 			"APP\\plugins\\": "../../plugins/",
 			"PKP\\Support\\": "Support/",
 			"PKP\\Domains\\": "Domains/",
-			"PKP\\Jobs\\": "Jobs/"
+			"PKP\\Jobs\\": "Jobs/",
+			"APP\\Jobs\\": "../../Jobs/"
 		}
 	}
 }
