@@ -17,6 +17,7 @@ namespace PKP\services;
 
 use APP\core\Application;
 use APP\statistics\StatisticsHelper;
+use Illuminate\Support\Facades\DB;
 use PKP\plugins\HookRegistry;
 
 class PKPStatsGeoService
@@ -206,5 +207,35 @@ class PKPStatsGeoService
         HookRegistry::call('StatsGeo::queryBuilder', [&$statsQB, $args]);
 
         return $statsQB;
+    }
+
+    /**
+     * Delete daily usage metrics for a month
+     */
+    public function deleteDailyMetrics(string $month)
+    {
+        DB::table('metrics_submission_geo_daily')->where(DB::raw('DATE_FORMAT(date, "%Y%m")'), '=', $month)->delete();
+    }
+
+    /**
+     * Delete monthly usage metrics for a month
+     */
+    public function deleteMonthlyMetrics(string $month)
+    {
+        DB::table('metrics_submission_geo_monthly')->where('month', $month)->delete();
+    }
+
+    /**
+     * Aggregate daily usage metrics by a month
+     */
+    public function aggregateMetrics(string $month)
+    {
+        DB::statement(
+            "
+			INSERT INTO metrics_submission_geo_monthly (context_id, submission_id, country, region, city, month, metric, metric_unique)
+			SELECT gd.context_id, gd.submission_id, COALESCE(gd.country, ''), COALESCE(gd.region, ''), COALESCE(gd.city, ''), DATE_FORMAT(gd.date, '%Y%m') as gdmonth, SUM(gd.metric), SUM(gd.metric_unique) FROM metrics_submission_geo_daily gd WHERE DATE_FORMAT(gd.date, '%Y%m') = ? GROUP BY gd.context_id, gd.submission_id, gd.country, gd.region, gd.city, gdmonth
+			",
+            [$month]
+        );
     }
 }
