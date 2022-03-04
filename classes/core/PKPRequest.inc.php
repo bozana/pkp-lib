@@ -543,6 +543,16 @@ class PKPRequest
     }
 
     /**
+     * Check if the HTTP_DNT (Do Not Track) is set
+     *
+     * @return boolean
+     */
+    public function isDNTSet()
+    {
+        return (array_key_exists('HTTP_DNT', $_SERVER) && ((int) $_SERVER['HTTP_DNT'] === 1));
+    }
+
+    /**
      * Return true if PATH_INFO is enabled.
      */
     public function isPathInfoEnabled()
