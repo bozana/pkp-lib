@@ -105,11 +105,65 @@ abstract class PKPUsageStatsLoader extends FileLoader
      */
     abstract protected function checkForeignKeys(object $entry): array;
     /**
+     * Get valid assoc types that an usage event can contain
+     */
+    abstract protected function getValidAssocTypes(): array;
+    /**
      * Validate the usage stats log entry
      *
      * @throws \Exception.
      */
-    abstract protected function isLogEntryValid(object $entry): void;
+    protected function isLogEntryValid(object $entry): void
+    {
+        if (!$this->validateDate($entry->time)) {
+            throw new \Exception(__('admin.scheduledTask.usageStatsLoader.invalidLogEntry.time'));
+        }
+        // check hashed IP ?
+        // check canonicalUrl ?
+        if (!is_int($entry->contextId)) {
+            throw new \Exception(__('admin.scheduledTask.usageStatsLoader.invalidLogEntry.contextId'));
+        } else {
+            $contextAssocType = Application::getContextAssocType();
+            if ($entry->assocType == $contextAssocType && $entry->assocId != $entry->contextId) {
+                throw new \Exception(__('admin.scheduledTask.usageStatsLoader.invalidLogEntry.contextAssocTypeNoMatch'));
+            }
+        }
+        if (!empty($entry->submissionId)) {
+            if (!is_int($entry->submissionId)) {
+                throw new \Exception(__('admin.scheduledTask.usageStatsLoader.invalidLogEntry.submissionId'));
+            } else {
+                if ($entry->assocType == Application::ASSOC_TYPE_SUBMISSION && $entry->assocId != $entry->submissionId) {
+                    throw new \Exception(__('admin.scheduledTask.usageStatsLoader.invalidLogEntry.submissionAssocTypeNoMatch'));
+                }
+            }
+        }
+
+        $validAssocTypes = $this->getValidAssocTypes();
+        if (!in_array($entry->assocType, $validAssocTypes)) {
+            throw new \Exception(__('admin.scheduledTask.usageStatsLoader.invalidLogEntry.assocType'));
+        }
+        if (!is_int($entry->assocId)) {
+            throw new \Exception(__('admin.scheduledTask.usageStatsLoader.invalidLogEntry.assocId'));
+        }
+        $validFileTypes = [
+            StatisticsHelper::STATISTICS_FILE_TYPE_PDF,
+            StatisticsHelper::STATISTICS_FILE_TYPE_DOC,
+            StatisticsHelper::STATISTICS_FILE_TYPE_HTML,
+            StatisticsHelper::STATISTICS_FILE_TYPE_OTHER,
+        ];
+        if (!empty($entry->fileType) && !in_array($entry->fileType, $validFileTypes)) {
+            throw new \Exception(__('admin.scheduledTask.usageStatsLoader.invalidLogEntry.fileType'));
+        }
+        if (!empty($entry->country) && (!ctype_alpha($entry->country) || !(strlen($entry->country) == 2))) {
+            throw new \Exception(__('admin.scheduledTask.usageStatsLoader.invalidLogEntry.country'));
+        }
+        if (!empty($entry->region) && (!ctype_alnum($entry->region) || !(strlen($entry->region) <= 3))) {
+            throw new \Exception(__('admin.scheduledTask.usageStatsLoader.invalidLogEntry.region'));
+        }
+        if (!is_array($entry->institutionIds)) {
+            throw new \Exception(__('admin.scheduledTask.usageStatsLoader.invalidLogEntry.institutionIds'));
+        }
+    }
 
     /**
      * @copydoc FileLoader::processFile()
@@ -184,6 +238,7 @@ abstract class PKPUsageStatsLoader extends FileLoader
             if (preg_match($parseRegex, $line, $m)) {
                 // This is a line in the old logfile format
                 $this->addExecutionLogEntry(__('admin.scheduledTask.usageStatsLoader.oldLogfileFormat', ['file' => $loadId, 'lineNumber' => $lineNumber]), ScheduledTaskHelper::SCHEDULED_TASK_MESSAGE_TYPE_ERROR);
+                continue;
             } else {
                 $entryData = json_decode($line);
             }
@@ -266,7 +321,7 @@ abstract class PKPUsageStatsLoader extends FileLoader
         $stagePath = StatisticsHelper::getUsageStatsDirPath() . '/' . self::FILE_LOADER_PATH_STAGING;
         $stageDir = opendir($stagePath);
         while ($filename = readdir($stageDir)) {
-            if (str_starts_with($filename, 'usage_events_BB_' . $month)) {
+            if (str_starts_with($filename, 'usage_events_' . $month)) {
                 $filesToConsider[] = $filename;
             }
         }
@@ -286,7 +341,7 @@ abstract class PKPUsageStatsLoader extends FileLoader
      */
     protected function getUsageEventCurrentDayLogName(): string
     {
-        return 'usage_events_BB_' . date('Ymd') . '.log';
+        return 'usage_events_' . date('Ymd') . '.log';
     }
 
     /**
