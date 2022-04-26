@@ -164,7 +164,7 @@ abstract class PKPStatsPublicationHandler extends APIHandler
                     ], 200);
                 }
             } else {
-                $response->withStatus($e->getCode())->withJsonError($e->getMessage());
+                return $response->withStatus($e->getCode())->withJsonError($e->getMessage());
             }
         }
 
@@ -254,7 +254,7 @@ abstract class PKPStatsPublicationHandler extends APIHandler
                 $emptyTimeline = $statsService->getEmptyTimelineIntervals($dateStart, $dateEnd, $allowedParams['timelineInterval']);
                 return $response->withJson($emptyTimeline, 200);
             } else {
-                $response->withStatus($e->getCode())->withJsonError($e->getMessage());
+                return $response->withStatus($e->getCode())->withJsonError($e->getMessage());
             }
         }
 
@@ -294,7 +294,7 @@ abstract class PKPStatsPublicationHandler extends APIHandler
                 $emptyTimeline = $statsService->getEmptyTimelineIntervals($dateStart, $dateEnd, $allowedParams['timelineInterval']);
                 return $response->withJson($emptyTimeline, 200);
             } else {
-                $response->withStatus($e->getCode())->withJsonError($e->getMessage());
+                return $response->withStatus($e->getCode())->withJsonError($e->getMessage());
             }
         }
 
@@ -410,6 +410,10 @@ abstract class PKPStatsPublicationHandler extends APIHandler
             return $response->withStatus(400)->withJsonError($result);
         }
 
+        if (!in_array($allowedParams['timelineInterval'], [StatisticsHelper::STATISTICS_DIMENSION_DAY, StatisticsHelper::STATISTICS_DIMENSION_MONTH])) {
+            return $response->withStatus(400)->withJsonError('api.stats.400.invalidTimelineInterval');
+        }
+
         $statsService = Services::get('publicationStats');
         $data = $statsService->getTimeline($allowedParams['timelineInterval'], $allowedParams);
 
@@ -460,6 +464,10 @@ abstract class PKPStatsPublicationHandler extends APIHandler
             return $response->withStatus(400)->withJsonError($result);
         }
 
+        if (!in_array($allowedParams['timelineInterval'], [StatisticsHelper::STATISTICS_DIMENSION_DAY, StatisticsHelper::STATISTICS_DIMENSION_MONTH])) {
+            return $response->withStatus(400)->withJsonError('api.stats.400.invalidTimelineInterval');
+        }
+
         $statsService = Services::get('publicationStats');
         $data = $statsService->getTimeline($allowedParams['timelineInterval'], $allowedParams);
 
@@ -505,7 +513,7 @@ abstract class PKPStatsPublicationHandler extends APIHandler
                     ], 200);
                 }
             } else {
-                $response->withStatus($e->getCode())->withJsonError($e->getMessage());
+                return $response->withStatus($e->getCode())->withJsonError($e->getMessage());
             }
         }
 
@@ -592,7 +600,7 @@ abstract class PKPStatsPublicationHandler extends APIHandler
                     ], 200);
                 }
             } else {
-                $response->withStatus($e->getCode())->withJsonError($e->getMessage());
+                return $response->withStatus($e->getCode())->withJsonError($e->getMessage());
             }
         }
 
@@ -675,7 +683,7 @@ abstract class PKPStatsPublicationHandler extends APIHandler
                     ], 200);
                 }
             } else {
-                $response->withStatus($e->getCode())->withJsonError($e->getMessage());
+                return $response->withStatus($e->getCode())->withJsonError($e->getMessage());
             }
         }
 
@@ -766,7 +774,7 @@ abstract class PKPStatsPublicationHandler extends APIHandler
                     ], 200);
                 }
             } else {
-                $response->withStatus($e->getCode())->withJsonError($e->getMessage());
+                return $response->withStatus($e->getCode())->withJsonError($e->getMessage());
             }
         }
 
@@ -872,6 +880,10 @@ abstract class PKPStatsPublicationHandler extends APIHandler
 
         if (array_key_exists('orderDirection', $allowedParams) && !in_array($allowedParams['orderDirection'], [StatisticsHelper::STATISTICS_ORDER_ASC, StatisticsHelper::STATISTICS_ORDER_DESC])) {
             throw new \Exception('api.stats.400.invalidOrderDirection', 400);
+        }
+
+        if (array_key_exists('timelineInterval', $allowedParams) && !in_array($allowedParams['timelineInterval'], [StatisticsHelper::STATISTICS_DIMENSION_DAY, StatisticsHelper::STATISTICS_DIMENSION_MONTH])) {
+            throw new \Exception('api.stats.400.invalidTimelineInterval', 400);
         }
 
         // Identify submissions which should be included in the results when a searchPhrase is passed
