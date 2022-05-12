@@ -14,13 +14,13 @@
 		{translate key="manager.setup.institutions"}
 	</h1>
 
-	<tabs :track-history="true">
-		<tab id="institutions" label="{translate key="manager.setup.institutions"}">
+	<panel>
+		<panel-section>
 			<institutions-list-panel
 				v-bind="components.institutions"
 				@set="set"
 			/>
-		</tab>
+		</panel-section>
 		{call_hook name="Template::Institutions"}
-	</tabs>
+	</panel>
 {/block}

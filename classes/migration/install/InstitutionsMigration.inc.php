@@ -13,6 +13,7 @@
 
 namespace PKP\migration\install;
 
+use APP\core\Application;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema as Schema;
 
@@ -20,6 +21,7 @@ class InstitutionsMigration extends \PKP\migration\Migration
 {
     /**
      * Run the migrations.
+     * This migration file is used during upgrades. If this schema changes, the upgrade scripts should be reviewed manually before a merging.
      */
     public function up(): void
     {
@@ -30,7 +32,7 @@ class InstitutionsMigration extends \PKP\migration\Migration
             $table->bigInteger('context_id');
             $table->string('ror', 255)->nullable();
             $table->softDeletes('deleted_at', 0);
-            $contextDao = \APP\core\Application::getContextDAO();
+            $contextDao = Application::getContextDAO();
             $table->foreign('context_id')->references($contextDao->primaryKeyColumn)->on($contextDao->tableName);
         });
 
@@ -70,6 +72,9 @@ class InstitutionsMigration extends \PKP\migration\Migration
      */
     public function down(): void
     {
+        Schema::table('institutional_subscriptions', function (Blueprint $table) {
+            $table->dropForeign('institution_id');
+        });
         Schema::drop('institution_settings');
         Schema::drop('institution_ip');
         Schema::drop('institutions');

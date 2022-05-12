@@ -136,7 +136,7 @@ class PKPUsageEventLogListener
         }
         $usageEventArray['institutionIds'] = [];
         if ($enableInstitutionUsageStats) {
-            $institutionIds = Repo::institution()->getIdsByIP($ip, $usageEventArray['contextId'])->toArray();
+            $institutionIds = Repo::institution()->getIds(Repo::institution()->getCollector()->filterByContextIds([$usageEventArray['contextId']])->filterByIps([$ip]));
             $usageEventArray['institutionIds'] = $institutionIds;
         }
         return $usageEventArray;

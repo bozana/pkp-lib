@@ -123,7 +123,7 @@ class PKPStatsSushiHandler extends APIHandler
             if ($customerId == 0) {
                 $institutionName = 'The World';
             } else {
-                if (Repo::institution()->existsByContextId($customerId, $context->getId())) {
+                if (Repo::institution()->existsInContext($customerId, $context->getId())) {
                     $institution = Repo::institution()->get($customerId);
                     if (isset($institution)) {
                         $institutionName = $institution->getLocalizedName();
@@ -294,7 +294,7 @@ class PKPStatsSushiHandler extends APIHandler
             if ($customerId == 0) {
                 $institutionName = 'The World';
             } else {
-                if (Repo::institution()->existsByContextId($customerId, $contextId)) {
+                if (Repo::institution()->existsInContext($customerId, $contextId)) {
                     $institution = Repo::institution()->get($customerId);
                     if (isset($institution)) {
                         $institutionId = [];

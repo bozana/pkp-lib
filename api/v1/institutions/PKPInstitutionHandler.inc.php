@@ -18,6 +18,7 @@ use APP\facades\Repo;
 use PKP\core\APIResponse;
 use PKP\handler\APIHandler;
 use PKP\plugins\HookRegistry;
+use PKP\security\authorization\ContextRequiredPolicy;
 use PKP\security\authorization\PolicySet;
 use PKP\security\authorization\RoleBasedHandlerOperationPolicy;
 use PKP\security\Role;
@@ -83,6 +84,8 @@ class PKPInstitutionHandler extends APIHandler
     {
         $rolePolicy = new PolicySet(PolicySet::COMBINING_PERMIT_OVERRIDES);
 
+        $this->addPolicy(new ContextRequiredPolicy($request));
+
         foreach ($roleAssignments as $role => $operations) {
             $rolePolicy->addPolicy(new RoleBasedHandlerOperationPolicy($request, $role, $operations));
         }
@@ -96,7 +99,7 @@ class PKPInstitutionHandler extends APIHandler
      */
     public function get(SlimHttpRequest $slimRequest, APIResponse $response, array $args): APIResponse
     {
-        if (!Repo::institution()->existsByContextId((int) $args['institutionId'], $this->getRequest()->getContext()->getId())) {
+        if (!Repo::institution()->existsInContext((int) $args['institutionId'], $this->getRequest()->getContext()->getId())) {
             return $response->withStatus(404)->withJsonError('api.institutions.404.institutionNotFound');
         }
         $institution = Repo::institution()->get((int) $args['institutionId']);
@@ -133,8 +136,8 @@ class PKPInstitutionHandler extends APIHandler
         $institutions = Repo::institution()->getMany($collector);
 
         return $response->withJson([
-            'itemsMax' => $institutions->count(),
-            'items' => Repo::institution()->getSchemaMap()->summarizeMany($institutions),
+            'itemsMax' => Repo::institution()->getCount($collector->limit(null)->offset(null)),
+            'items' => Repo::institution()->getSchemaMap()->summarizeMany($institutions->values()),
         ], 200);
     }
 
@@ -147,16 +150,11 @@ class PKPInstitutionHandler extends APIHandler
     {
         $request = $this->getRequest();
 
-        if (!$request->getContext()) {
-            throw new \Exception('You can not add an institution without sending a request to the API endpoint of a particular context.');
-        }
-
         $params = $this->convertStringsToSchema(PKPSchemaService::SCHEMA_INSTITUTION, $slimRequest->getParsedBody());
         $params['contextId'] = $request->getContext()->getId();
         // Convert IP ranges string to array
         if (!empty($params['ipRanges'])) {
-            $ipRanges = explode(PHP_EOL, trim($params['ipRanges']));
-            $params['ipRanges'] = $ipRanges;
+            $params['ipRanges'] = $this->convertIpToArray($params['ipRanges']);
         }
 
         $primaryLocale = $request->getContext()->getPrimaryLocale();
@@ -180,7 +178,7 @@ class PKPInstitutionHandler extends APIHandler
         $request = $this->getRequest();
         $context = $request->getContext();
 
-        if (!Repo::institution()->existsByContextId((int) $args['institutionId'], $context->getId())) {
+        if (!Repo::institution()->existsInContext((int) $args['institutionId'], $context->getId())) {
             return $response->withStatus(404)->withJsonError('api.institutions.404.institutionNotFound');
         }
 
@@ -191,8 +189,7 @@ class PKPInstitutionHandler extends APIHandler
         $params['contextId'] = $context->getId();
         // Convert IP ranges string to array
         if (!empty($params['ipRanges'])) {
-            $ipRanges = explode(PHP_EOL, trim($params['ipRanges']));
-            $params['ipRanges'] = $ipRanges;
+            $params['ipRanges'] = $this->convertIpToArray($params['ipRanges']);
         }
 
         $primaryLocale = $context->getPrimaryLocale();
@@ -212,7 +209,7 @@ class PKPInstitutionHandler extends APIHandler
      */
     public function delete(SlimHttpRequest $slimRequest, APIResponse $response, array $args): APIResponse
     {
-        if (!Repo::institution()->existsByContextId((int) $args['institutionId'], $this->getRequest()->getContext()->getId())) {
+        if (!Repo::institution()->existsInContext((int) $args['institutionId'], $this->getRequest()->getContext()->getId())) {
             return $response->withStatus(404)->withJsonError('api.institutions.404.institutionNotFound');
         }
 
@@ -220,5 +217,13 @@ class PKPInstitutionHandler extends APIHandler
         $institutionProps = Repo::institution()->getSchemaMap()->map($institution);
         Repo::institution()->delete($institution);
         return $response->withJson($institutionProps, 200);
+    }
+
+    /**
+     * Convert IP ranges string to array
+     */
+    protected function convertIpToArray(string $ipString): array
+    {
+        return array_map('trim', explode(PHP_EOL, trim($ipString)));
     }
 }

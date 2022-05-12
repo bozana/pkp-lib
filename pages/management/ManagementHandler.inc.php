@@ -400,7 +400,7 @@ class ManagementHandler extends Handler
 
         $itemsMax = Repo::institution()->getCount($collector);
         $items = Repo::institution()->getSchemaMap()->summarizeMany(
-            Repo::institution()->getMany($collector->limit(30))
+            Repo::institution()->getMany($collector->limit(30))->values()
         );
 
         $institutionsListPanel = new \PKP\components\listPanels\PKPInstitutionsListPanel(

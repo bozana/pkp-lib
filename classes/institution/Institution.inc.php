@@ -70,7 +70,7 @@ class Institution extends \PKP\core\DataObject
     /**
      * Get the name of the institution
      */
-    public function getName(string $locale = null): string
+    public function getName(string $locale = null): string|array
     {
         return $this->getData('name', $locale);
     }
@@ -97,15 +97,5 @@ class Institution extends \PKP\core\DataObject
     public function setIPRanges(array $ipRanges): void
     {
         $this->setData('ipRanges', $ipRanges);
-    }
-}
-
-if (!PKP_STRICT_MODE) {
-    class_alias('\PKP\institution\Institution', '\Institution');
-    foreach ([
-        'IP_RANGE_RANGE',
-        'IP_RANGE_WILDCARD',
-    ] as $constantName) {
-        define($constantName, constant('\Institution::' . $constantName));
     }
 }

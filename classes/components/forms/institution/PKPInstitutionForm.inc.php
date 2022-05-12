@@ -47,7 +47,10 @@ class PKPInstitutionForm extends FormComponent
             ->addField(new FieldTextarea('ipRanges', [
                 'label' => __('manager.institutions.form.ipRanges'),
                 'description' => __('manager.institutions.form.ipRangesInstructions'),
-                'isMultilingual' => false,
+            ]))
+            ->addField(new FieldText('ror', [
+                'label' => __('manager.institutions.form.ror'),
+                'description' => __('manager.institutions.form.ror.description'),
             ]));
     }
 }

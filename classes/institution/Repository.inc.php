@@ -56,9 +56,9 @@ class Repository
     /**
      * Checks if an institution with the given ID and context ID exists.
      */
-    public function existsByContextId(int $id, int $contextId): bool
+    public function existsInContext(int $id, int $contextId): bool
     {
-        return $this->dao->existsByContextId($id, $contextId);
+        return $this->dao->existsInContext($id, $contextId);
     }
 
     /** @copydoc DAO::get() */
@@ -79,16 +79,16 @@ class Repository
         return $this->dao->getIds($query);
     }
 
-    /** @copydoc DAO::getIdsByIP() */
-    public function getIdsByIP(string $ip, int $contextId): Collection
-    {
-        return $this->dao->getIdsByIP($ip, $contextId);
-    }
-
     /** @copydoc DAO::getMany() */
     public function getMany(Collector $query): LazyCollection
     {
         return $this->dao->getMany($query);
+    }
+
+    /** @copydoc DAO::getSoftDeleted() */
+    public function getSoftDeleted(Collector $query): LazyCollection
+    {
+        return $this->dao->getSoftDeleted($query);
     }
 
     /** @copydoc DAO::getCollector() */
@@ -127,7 +127,7 @@ class Repository
             $this->schemaService->getValidationRules($this->dao->schema, $allowedLocales)
         );
 
-        // Check required fields if we're adding a context
+        // Check required fields if we're adding an institution
         ValidatorFactory::required(
             $validator,
             $object,

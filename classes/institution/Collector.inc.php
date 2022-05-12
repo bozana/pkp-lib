@@ -21,11 +21,11 @@ class Collector implements CollectorInterface
 {
     public DAO $dao;
     public ?array $contextIds = null;
+    public ?array $ips = null;
     public string $searchPhrase = '';
     public ?int $count = null;
     public ?int $offset = null;
-    public bool $considerSoftDeletes = false;
-    public bool $onlySoftDeletes = false;
+    public bool $includeSoftDeletes = false;
 
     public function __construct(DAO $dao)
     {
@@ -42,11 +42,11 @@ class Collector implements CollectorInterface
     }
 
     /**
-     * Filter soft deleted institutions
+     * Filter institutions by one or more IPs
      */
-    public function filterSoftDeletes(): self
+    public function filterByIps(?array $ips): self
     {
-        $this->onlySoftDeletes = true;
+        $this->ips = $ips;
         return $this;
     }
 
@@ -81,9 +81,9 @@ class Collector implements CollectorInterface
     /**
      * Consider soft deleted institutions
      */
-    public function considerSoftDeletes(): self
+    public function includeSoftDeletes(bool $include = true): self
     {
-        $this->considerSoftDeletes = true;
+        $this->includeSoftDeletes = $include;
         return $this;
     }
 
@@ -98,10 +98,8 @@ class Collector implements CollectorInterface
             $qb->whereIn('i.context_id', $this->contextIds);
         }
 
-        if ($this->onlySoftDeletes) {
-            $qb->whereNotNull('deleted_at');
-        } elseif (!$this->considerSoftDeletes) {
-            $qb->whereNull('deleted_at');
+        if (!$this->includeSoftDeletes) {
+            $qb->whereNull('i.deleted_at');
         }
 
         if (!empty($this->searchPhrase)) {
@@ -117,16 +115,51 @@ class Collector implements CollectorInterface
                                 ->where(DB::raw('lower(iss.setting_value)'), 'LIKE', DB::raw("lower('%{$word}%')"));
                         })
                             ->orWhereIn('i.institution_id', function ($qb) use ($word) {
-                                $qb->select('ip.institution_id')
-                                    ->from('institution_ip as ip')
-                                    ->where(DB::raw('lower(ip.ip_string)'), 'LIKE', DB::raw("lower('%{$word}%')"));
+                                $qb->select('ips.institution_id')
+                                    ->from('institution_ip as ips')
+                                    ->where(DB::raw('lower(ips.ip_string)'), 'LIKE', DB::raw("lower('%{$word}%')"));
                             });
                     });
                 }
             }
         }
 
-        $qb->select('i.*')->get();
+        if (!is_null($this->ips)) {
+            foreach ($this->ips as $index => $ip) {
+                $ip = sprintf('%u', ip2long($ip));
+                if ($index === 0) {
+                    $qb->whereIn('i.institution_id', function ($qb) use ($ip) {
+                        $qb->select('ip.institution_id')
+                            ->from('institution_ip as ip')
+                            ->where(function ($qb) use ($ip) {
+                                $qb->whereNotNull('ip.ip_end')
+                                    ->where('ip.ip_start', '<=', $ip)
+                                    ->where('ip.ip_end', '>=', $ip);
+                            })
+                            ->orWhere(function ($qb) use ($ip) {
+                                $qb->whereNull('ip.ip_end')
+                                    ->where('ip.ip_start', '=', $ip);
+                            });
+                    });
+                    continue;
+                }
+                $qb->orWhereIn('i.institution_id', function ($qb) use ($ip) {
+                    $qb->select('ip.institution_id')
+                        ->from('institution_ip as ip')
+                        ->where(function ($qb) use ($ip) {
+                            $qb->whereNotNull('ip.ip_end')
+                                ->where('ip.ip_start', '<=', $ip)
+                                ->where('ip.ip_end', '>=', $ip);
+                        })
+                        ->orWhere(function ($qb) use ($ip) {
+                            $qb->whereNull('ip.ip_end')
+                                ->where('ip.ip_start', '=', $ip);
+                        });
+                });
+            }
+        }
+
+        //$qb->select('i.*')->get();
 
         if (!is_null($this->count)) {
             $qb->limit($this->count);

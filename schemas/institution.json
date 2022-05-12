@@ -1,7 +1,8 @@
 {
 	"title": "Institution",
-	"description": "An institution item.",
+	"description": "An institution, such as a university, that may be used to track usage statistics, handle subscriptions, and more.",
 	"required": [
+		"contextId",
 		"name"
 	],
 	"properties": {
@@ -34,7 +35,8 @@
 			"description": "The ROR of this institution. See: https://ror.org/",
 			"apiSummary": true,
 			"validation": [
-				"nullable"
+				"nullable",
+				"regex:/^0[^ILOU]{6}\\d{2}$/"
 			]
 		},
 		"deletedAt": {

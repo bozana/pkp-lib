@@ -251,6 +251,12 @@ msgstr "Before this component can be deleted, you must associate all related sub
 msgid "manager.institutions.edit"
 msgstr "Edit Institution"
 
+msgid "manager.institutions.form.ror"
+msgstr "ROR"
+
+msgid "manager.institutions.form.ror.description"
+msgstr "Research Organization Registry ID for this institution."
+
 msgid "manager.institutions.form.ipRanges"
 msgstr "IP ranges"
 

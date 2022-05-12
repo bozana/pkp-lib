@@ -22,11 +22,13 @@ use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\LazyCollection;
 use PKP\core\EntityDAO;
-use PKP\plugins\HookRegistry;
+use PKP\core\SoftDeleteTrait;
 use PKP\services\PKPSchemaService;
 
 class DAO extends EntityDAO
 {
+    use SoftDeleteTrait;
+
     /** @copydoc EntityDAO::$schema */
     public $schema = PKPSchemaService::SCHEMA_INSTITUTION;
 
@@ -58,7 +60,7 @@ class DAO extends EntityDAO
     /**
      * Check if an institution exists with this ID and context ID
      */
-    public function existsByContextId(int $id, int $contextId): bool
+    public function existsInContext(int $id, int $contextId): bool
     {
         return DB::table($this->table)
             ->where($this->primaryKeyColumn, '=', $id)
@@ -74,7 +76,6 @@ class DAO extends EntityDAO
         return $query
             ->getQueryBuilder()
             ->select('i.' . $this->primaryKeyColumn)
-            ->get()
             ->count();
     }
 
@@ -98,28 +99,6 @@ class DAO extends EntityDAO
     }
 
     /**
-     * Get a list of institution ids containing the given IP and for the given context ID
-     */
-    public function getIdsByIP(string $IP, int $contextId): Collection
-    {
-        $IP = sprintf('%u', ip2long($IP));
-        return DB::table($this->table . ' as i')
-            ->join('institution_ip as ip', 'ip.institution_id', '=', 'i.institution_id')
-            ->where('i.context_id', '=', $contextId)
-            ->where(function ($query) use ($IP) {
-                $query->whereNotNull('ip.ip_end')
-                    ->where('ip.ip_start', '<=', $IP)
-                    ->where('ip.ip_end', '>=', $IP);
-            })
-            ->orWhere(function ($query) use ($IP) {
-                $query->whereNull('ip.ip_end')
-                    ->where('ip.ip_start', '=', $IP);
-            })
-            ->select('i.' . $this->primaryKeyColumn)
-            ->pluck('i.' . $this->primaryKeyColumn);
-    }
-
-    /**
      * Get a collection of institutions matching the configured query
      */
     public function getMany(Collector $query): LazyCollection
@@ -131,7 +110,26 @@ class DAO extends EntityDAO
 
         return LazyCollection::make(function () use ($rows) {
             foreach ($rows as $row) {
-                yield $this->fromRow($row);
+                yield $row->institution_id => $this->fromRow($row);
+            }
+        });
+    }
+
+    /**
+     * Get a collection of deleted institutions matching the configured query
+     */
+    public function getSoftDeleted(Collector $query): LazyCollection
+    {
+        $rows = $query
+            ->includeSoftDeletes(true)
+            ->getQueryBuilder()
+            ->whereNotNull('deleted_at')
+            ->select(['i.*'])
+            ->get();
+
+        return LazyCollection::make(function () use ($rows) {
+            foreach ($rows as $row) {
+                yield $row->institution_id => $this->fromRow($row);
             }
         });
     }
@@ -144,7 +142,7 @@ class DAO extends EntityDAO
         $institution = parent::fromRow($row);
 
         $ipRanges = DB::table('institution_ip')
-            ->where($this->primaryKeyColumn, '=', (int) $institution->getId())
+            ->where($this->primaryKeyColumn, '=', $institution->getId())
             ->pluck('ip_string')
             ->toArray();
 
@@ -194,77 +192,77 @@ class DAO extends EntityDAO
         $shouldSoftDelete = DB::table('institutional_subscriptions')
             ->where('institution_id', '=', $institution->getId())
             ->exists();
-        HookRegistry::call('Institution::shouldSoftDelete', [&$shouldSoftDelete]);
         if ($shouldSoftDelete) {
-            parent::_softDelete($institution);
+            $this->_softDelete($institution);
         } else {
-            parent::_delete($institution);
             $this->deleteIPRanges($institution->getId());
+            parent::_delete($institution);
         }
     }
 
     /**
      * Insert institution IP ranges.
      */
-    private function insertIPRanges(int $institutionId, array $ipRanges): void
+    protected function insertIPRanges(int $institutionId, array $ipRanges): void
     {
-        if (!empty($ipRanges) && !empty($institutionId)) {
-            foreach ($ipRanges as $ipRange) {
-                $ipStart = null;
-                $ipEnd = null;
+        if (empty($ipRanges) || empty($institutionId)) {
+            return;
+        }
+        foreach ($ipRanges as $ipRange) {
+            $ipStart = null;
+            $ipEnd = null;
 
-                $ipRange = trim($ipRange);
-                // Parse and check single IP string
-                if (strpos($ipRange, Institution::IP_RANGE_RANGE) === false) {
+            $ipRange = trim($ipRange);
+            // Parse and check single IP string
+            if (strpos($ipRange, Institution::IP_RANGE_RANGE) === false) {
 
-                    // Check for wildcards in IP
-                    if (strpos($ipRange, Institution::IP_RANGE_WILDCARD) === false) {
+                // Check for wildcards in IP
+                if (strpos($ipRange, Institution::IP_RANGE_WILDCARD) === false) {
 
-                        // Get non-CIDR IP
-                        if (strpos($ipRange, '/') === false) {
-                            $ipStart = sprintf('%u', ip2long($ipRange));
+                    // Get non-CIDR IP
+                    if (strpos($ipRange, '/') === false) {
+                        $ipStart = sprintf('%u', ip2long($ipRange));
 
-                        // Convert CIDR IP to IP range
+                    // Convert CIDR IP to IP range
+                    } else {
+                        [$cidrIPString, $cidrBits] = explode('/', $ipRange);
+
+                        if ($cidrBits == 0) {
+                            $cidrMask = 0;
                         } else {
-                            [$cidrIPString, $cidrBits] = explode('/', $ipRange);
-
-                            if ($cidrBits == 0) {
-                                $cidrMask = 0;
-                            } else {
-                                $cidrMask = (0xffffffff << (32 - $cidrBits));
-                            }
-
-                            $ipStart = sprintf('%u', ip2long($cidrIPString) & $cidrMask);
-
-                            if ($cidrBits != 32) {
-                                $ipEnd = sprintf('%u', ip2long($cidrIPString) | (~$cidrMask & 0xffffffff));
-                            }
+                            $cidrMask = (0xffffffff << (32 - $cidrBits));
                         }
 
-                        // Convert wildcard IP to IP range
-                    } else {
-                        $ipStart = sprintf('%u', ip2long(str_replace(Institution::IP_RANGE_WILDCARD, '0', $ipRange)));
-                        $ipEnd = sprintf('%u', ip2long(str_replace(Institution::IP_RANGE_WILDCARD, '255', $ipRange)));
+                        $ipStart = sprintf('%u', ip2long($cidrIPString) & $cidrMask);
+
+                        if ($cidrBits != 32) {
+                            $ipEnd = sprintf('%u', ip2long($cidrIPString) | (~$cidrMask & 0xffffffff));
+                        }
                     }
 
-                    // Convert wildcard IP range to IP range
+                    // Convert wildcard IP to IP range
                 } else {
-                    [$ipStart, $ipEnd] = explode(Institution::IP_RANGE_RANGE, $ipRange);
-
-                    // Replace wildcards in start and end of range
-                    $ipStart = sprintf('%u', ip2long(str_replace(Institution::IP_RANGE_WILDCARD, '0', trim($ipStart))));
-                    $ipEnd = sprintf('%u', ip2long(str_replace(Institution::IP_RANGE_WILDCARD, '255', trim($ipEnd))));
+                    $ipStart = sprintf('%u', ip2long(str_replace(Institution::IP_RANGE_WILDCARD, '0', $ipRange)));
+                    $ipEnd = sprintf('%u', ip2long(str_replace(Institution::IP_RANGE_WILDCARD, '255', $ipRange)));
                 }
 
-                // Insert IP or IP range
-                if ($ipStart != null) {
-                    DB::table('institution_ip')->insert([
-                        'institution_id' => $institutionId,
-                        'ip_string' => $ipRange,
-                        'ip_start' => $ipStart,
-                        'ip_end' => $ipEnd
-                    ]);
-                }
+                // Convert wildcard IP range to IP range
+            } else {
+                [$ipStart, $ipEnd] = explode(Institution::IP_RANGE_RANGE, $ipRange);
+
+                // Replace wildcards in start and end of range
+                $ipStart = sprintf('%u', ip2long(str_replace(Institution::IP_RANGE_WILDCARD, '0', trim($ipStart))));
+                $ipEnd = sprintf('%u', ip2long(str_replace(Institution::IP_RANGE_WILDCARD, '255', trim($ipEnd))));
+            }
+
+            // Insert IP or IP range
+            if ($ipStart != null) {
+                DB::table('institution_ip')->insert([
+                    'institution_id' => $institutionId,
+                    'ip_string' => $ipRange,
+                    'ip_start' => $ipStart,
+                    'ip_end' => $ipEnd
+                ]);
             }
         }
     }
