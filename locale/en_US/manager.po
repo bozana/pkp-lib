@@ -665,16 +665,13 @@ msgstr "Roles"
 msgid "manager.setup.statistics"
 msgstr "Statistics"
 
-msgid "manager.settings.statistics.archivedUsageStatsLogFiles"
-msgstr "Archives"
+msgid "manager.settings.statistics.compressStatsLogs.description"
+msgstr "Choose what to do with the archived log files."
 
-msgid "manager.settings.statistics.archivedUsageStatsLogFiles.description"
-msgstr "Choose what to do with the archived log files. To compress the archived log files you will have to configure the gzip setting inside config.inc.php."
-
-msgid "manager.settings.statistics.archivedUsageStatsLogFiles.default"
+msgid "manager.settings.statistics.compressStatsLogs.default"
 msgstr "Leave the archived log files as they are"
 
-msgid "manager.settings.statistics.archivedUsageStatsLogFiles.compress"
+msgid "manager.settings.statistics.compressStatsLogs.compress"
 msgstr "Compress archives"
 
 msgid "manager.settings.statistics.keepDaily"

@@ -16,6 +16,8 @@ namespace PKP\components\forms\context;
 
 use PKP\components\forms\FieldOptions;
 use PKP\components\forms\FormComponent;
+use PKP\context\Context;
+use PKP\site\Site;
 
 define('FORM_CONTEXT_STATISTICS', 'contextStatistics');
 
@@ -32,59 +34,49 @@ class PKPContextStatisticsForm extends FormComponent
      *
      * @param string $action URL to submit the form to
      * @param array $locales Supported locales
-     * @param Site $site
-     * @param Context $context
      */
-    public function __construct(string $action, array $locales, \PKP\site\Site $site, \PKP\context\Context $context)
+    public function __construct(string $action, array $locales, Site $site, Context $context)
     {
         $this->action = $action;
         $this->locales = $locales;
 
-        $geoOptionsValues = [
-            __('manager.settings.statistics.geoUsageStats.disabled'),
-            __('manager.settings.statistics.geoUsageStats.countryLevel'),
-            __('manager.settings.statistics.geoUsageStats.regionLevel'),
-            __('manager.settings.statistics.geoUsageStats.cityLevel'),
+        $possibleGeoOptions = [
+            'disabled' => __('manager.settings.statistics.geoUsageStats.disabled'),
+            'country' => __('manager.settings.statistics.geoUsageStats.countryLevel'),
+            'country+region' => __('manager.settings.statistics.geoUsageStats.regionLevel'),
+            'country+region+city' => __('manager.settings.statistics.geoUsageStats.cityLevel'),
         ];
-        $geoOptions = [
-            [
-                'value' => 0,
-                'label' => $geoOptionsValues[0],
-            ],
-        ];
-        for ($i = 1; $i <= $site->getData('enableGeoUsageStats'); $i++) {
+        $geoOptions = [];
+        foreach ($possibleGeoOptions as $value => $label) {
+            if ($site->getData('enableGeoUsageStats') === $value) {
+                break;
+            }
             $geoOptions[] = [
-                'value' => $i,
-                'label' => $geoOptionsValues[$i],
+                'value' => $value,
+                'label' => $label,
             ];
         }
 
-        $this->addGroup([
-            'id' => 'geo',
-        ])
-            ->addField(new FieldOptions('enableGeoUsageStats', [
+        if ($site->getData('enableGeoUsageStats') && $site->getData('enableGeoUsageStats') !== 'disabled') {
+            $this->addField(new FieldOptions('enableGeoUsageStats', [
                 'label' => __('manager.settings.statistics.geoUsageStats'),
-                'groupId' => 'geo',
                 'type' => 'radio',
                 'options' => $geoOptions,
                 'value' => $context->getData('enableGeoUsageStats') !== null ? $context->getData('enableGeoUsageStats') : $site->getData('enableGeoUsageStats'),
             ]));
+        }
         if ($site->getData('enableInstitutionUsageStats')) {
-            $this->addGroup([
-                'id' => 'institution',
-            ])
-                ->addField(new FieldOptions('enableInstitutionUsageStats', [
-                    'label' => __('manager.settings.statistics.institutionUsageStats'),
-                    'groupId' => 'institution',
-                    'options' => [
-                        [
-                            'value' => true,
-                            'label' => __('manager.settings.statistics.institutionUsageStats.enable'),
-                        ],
+            $this->addField(new FieldOptions('enableInstitutionUsageStats', [
+                'label' => __('manager.settings.statistics.institutionUsageStats'),
+                'options' => [
+                    [
+                        'value' => true,
+                        'label' => __('manager.settings.statistics.institutionUsageStats.enable'),
                     ],
-                    'default' => false,
-                    'value' => $context->getData('enableInstitutionUsageStats') !== null ? $context->getData('enableInstitutionUsageStats') : $site->getData('enableInstitutionUsageStats'),
-                ]));
+                ],
+                'default' => false,
+                'value' => $context->getData('enableInstitutionUsageStats') !== null ? $context->getData('enableInstitutionUsageStats') : $site->getData('enableInstitutionUsageStats'),
+            ]));
         }
     }
 }

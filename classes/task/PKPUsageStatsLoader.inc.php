@@ -54,7 +54,7 @@ abstract class PKPUsageStatsLoader extends FileLoader
 
         // shall the archived log files be ompressed
         $site = Application::get()->getRequest()->getSite();
-        if ($site->getData('archivedUsageStatsLogFiles') == 1) {
+        if ($site->getData('compressStatsLogs')) {
             $this->setCompressArchives(true);
         }
 
@@ -211,7 +211,7 @@ abstract class PKPUsageStatsLoader extends FileLoader
         $site = Application::get()->getRequest()->getSite();
         // If the daily metrics are not kept, and this is not the current month (which is kept in the DB)
         // the CLI script to reprocess the whole month should be called.
-        if (!$site->getData('usageStatsKeepDaily') && $month != $currentMonth) {
+        if (!$site->getData('keepDailyUsageStats') && $month != $currentMonth) {
             // Check if the month has already been processed,
             // currently only the table metrics_counter_submission_monthly will be considered.
             // TO-DO: once we decided how the log files in the old format should be reprocessed

@@ -820,16 +820,16 @@
 			"apiSummary": true
 		},
 		"enableGeoUsageStats": {
-			"type": "integer",
-			"description": "Enable Geo usage stats. `0` means that the Geo usage stats are disabled. `1` will enable the usage stats containing country information. `2` will enable, where possible, the usage stats containing country and region. `3` will enable, where possible, the usage stats containing country, region and city.",
-			"default": 0,
+			"type": "string",
+			"description": "Whether to track usage statistics by location, and whether to track at the country, region or city level.",
+			"default": "",
 			"validation": [
-				"in:0,1,2,3"
+				"in:disabled,country,country+region,country+region+city"
 			]
 		},
 		"enableInstitutionUsageStats": {
 			"type": "boolean",
-			"description": "Enable institution usage stats.",
+			"description": "Whether to track usage statistics by institutions. Requires institutional IP ranges to be configured.",
 			"default": false
 		}
 	}

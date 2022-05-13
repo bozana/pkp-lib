@@ -113,17 +113,17 @@ class PKPUsageEventLogListener
         $site = Application::get()->getRequest()->getSite();
         $context = Application::get()->getRequest()->getContext();
         $enableGeoUsageStats = $site->getData('enableGeoUsageStats');
-        if (($enableGeoUsageStats > 0) && ($context->getData('enableGeoUsageStats') !== null) && ($context->getData('enableGeoUsageStats') < $site->getData('enableGeoUsageStats'))) {
+        if (($enableGeoUsageStats != 'disabled') && ($context->getData('enableGeoUsageStats') !== null) && ($context->getData('enableGeoUsageStats') != $site->getData('enableGeoUsageStats'))) {
             $enableGeoUsageStats = $context->getData('enableGeoUsageStats');
         }
         // Geo data
         $usageEventArray['country'] = $usageEventArray['region'] = $usageEventArray['city'] = null;
-        if ($enableGeoUsageStats > 0) {
+        if ($enableGeoUsageStats != 'disabled') {
             $geoIPArray = $this->_getCachedIPLocation($ip, $hashedIp, $flushCache);
             $usageEventArray['country'] = $geoIPArray['country'];
-            if ($enableGeoUsageStats > 1) {
+            if ($enableGeoUsageStats == 'country+region') {
                 $usageEventArray['region'] = $geoIPArray['region'];
-                if ($enableGeoUsageStats == 3) {
+                if ($enableGeoUsageStats == 'country+region+city') {
                     $usageEventArray['city'] = $geoIPArray['city'];
                 }
             }

@@ -298,7 +298,7 @@ class ManagementHandler extends Handler
 
         $site = $request->getSite();
         $contextStatisticsForm = new \PKP\components\forms\context\PKPContextStatisticsForm($apiUrl, $locales, $site, $context);
-
+        $displayStatisticsTab = ($site->getData('enableGeoUsageStats') && $site->getData('enableGeoUsageStats') !== 'disabled') || $site->getData('enableInstitutionUsageStats');
         $templateMgr->setConstants([
             'FORM_PAYMENT_SETTINGS' => FORM_PAYMENT_SETTINGS,
             'FORM_CONTEXT_STATISTICS' => FORM_CONTEXT_STATISTICS,
@@ -320,7 +320,10 @@ class ManagementHandler extends Handler
                 'isCurrent' => false,
             ],
         ]);
-        $templateMgr->assign('pageTitle', __('manager.distribution.title'));
+        $templateMgr->assign([
+            'pageTitle' => __('manager.distribution.title'),
+            'displayStatisticsTab' => $displayStatisticsTab,
+        ]);
     }
 
     /**
