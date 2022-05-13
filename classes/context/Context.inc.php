@@ -23,6 +23,7 @@ use Illuminate\Support\Arr;
 use PKP\config\Config;
 use PKP\facades\Locale;
 use PKP\plugins\PluginRegistry;
+use PKP\site\Site;
 
 abstract class Context extends \PKP\core\DataObject
 {
@@ -534,6 +535,20 @@ abstract class Context extends \PKP\core\DataObject
             $views = (int) current($metrics)->metric;
         }
         return $views;
+    }
+
+    /**
+     * Whether to track usage statistics by institutions.
+     * Consider context setting only if the site setting is enabled and context setting disabled (= false).
+     */
+    public function isInstitutionStatsEnabled(Site $site): bool
+    {
+        $enableInstitutionUsageStats = $site->getData('enableInstitutionUsageStats');
+        if ($enableInstitutionUsageStats &&
+            ($this->getData('enableInstitutionUsageStats') !== null) && !$this->getData('enableInstitutionUsageStats')) {
+            $enableInstitutionUsageStats = $this->getData('enableInstitutionUsageStats');
+        }
+        return $enableInstitutionUsageStats;
     }
 }
 

@@ -130,12 +130,8 @@ class PKPUsageEventLogListener
         }
 
         // institutions IDs
-        $enableInstitutionUsageStats = $site->getData('enableInstitutionUsageStats');
-        if ($enableInstitutionUsageStats && ($context->getData('enableInstitutionUsageStats') !== null) && !$context->getData('enableInstitutionUsageStats')) {
-            $enableInstitutionUsageStats = $context->getData('enableInstitutionUsageStats');
-        }
         $usageEventArray['institutionIds'] = [];
-        if ($enableInstitutionUsageStats) {
+        if ($context->isInstitutionStatsEnabled($site)) {
             $institutionIds = Repo::institution()->getIds(Repo::institution()->getCollector()->filterByContextIds([$usageEventArray['contextId']])->filterByIps([$ip]));
             $usageEventArray['institutionIds'] = $institutionIds;
         }
