@@ -1,13 +1,13 @@
 <?php
 
 /**
- * @file classes/statistics/UsageStatsInstitutionTemporaryRecordDAO.inc.php
+ * @file classes/statistics/TemporaryInstitutionsDAO.inc.php
  *
  * Copyright (c) 2013-2021 Simon Fraser University
  * Copyright (c) 2003-2021 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
- * @class UsageStatsInstitutionTemporaryRecordDAO
+ * @class TemporaryInstitutionsDAO
  * @ingroup statistics
  *
  * @brief Operations for retrieving and adding the normalized data for institutions usage stats temporary records.
@@ -18,7 +18,7 @@ namespace PKP\statistics;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
-class UsageStatsInstitutionTemporaryRecordDAO
+class TemporaryInstitutionsDAO
 {
     /** The name of the table */
     public string $table = 'usage_stats_institution_temporary_records';
