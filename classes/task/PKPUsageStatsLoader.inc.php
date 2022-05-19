@@ -130,28 +130,14 @@ abstract class PKPUsageStatsLoader extends FileLoader
         // check canonicalUrl ?
         if (!is_int($entry->contextId)) {
             throw new \Exception(__('admin.scheduledTask.usageStatsLoader.invalidLogEntry.contextId'));
-        } else {
-            $contextAssocType = Application::getContextAssocType();
-            if ($entry->assocType == $contextAssocType && $entry->assocId != $entry->contextId) {
-                throw new \Exception(__('admin.scheduledTask.usageStatsLoader.invalidLogEntry.contextAssocTypeNoMatch'));
-            }
         }
-        if (!empty($entry->submissionId)) {
-            if (!is_int($entry->submissionId)) {
-                throw new \Exception(__('admin.scheduledTask.usageStatsLoader.invalidLogEntry.submissionId'));
-            } else {
-                if ($entry->assocType == Application::ASSOC_TYPE_SUBMISSION && $entry->assocId != $entry->submissionId) {
-                    throw new \Exception(__('admin.scheduledTask.usageStatsLoader.invalidLogEntry.submissionAssocTypeNoMatch'));
-                }
-            }
+        if (!empty($entry->submissionId) && !is_int($entry->submissionId)) {
+            throw new \Exception(__('admin.scheduledTask.usageStatsLoader.invalidLogEntry.submissionId'));
         }
 
         $validAssocTypes = $this->getValidAssocTypes();
         if (!in_array($entry->assocType, $validAssocTypes)) {
             throw new \Exception(__('admin.scheduledTask.usageStatsLoader.invalidLogEntry.assocType'));
-        }
-        if (!is_int($entry->assocId)) {
-            throw new \Exception(__('admin.scheduledTask.usageStatsLoader.invalidLogEntry.assocId'));
         }
         $validFileTypes = [
             StatisticsHelper::STATISTICS_FILE_TYPE_PDF,
