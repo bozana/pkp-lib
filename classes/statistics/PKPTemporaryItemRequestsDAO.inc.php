@@ -56,12 +56,11 @@ class PKPTemporaryItemRequestsDAO
             'ip' => $entryData->ip,
             'user_agent' => substr($entryData->userAgent, 0, 255),
             'line_number' => $lineNumber,
-            'issue_id' => !empty($entryData->ssueId) ? $entryData->issueId : null,
             'context_id' => $entryData->contextId,
             'submission_id' => $entryData->submissionId,
             'representation_id' => $entryData->representationId,
+            'submission_file_id' => $entryData->submissionFileId,
             'assoc_type' => $entryData->assocType,
-            'assoc_id' => $entryData->assocId,
             'file_type' => $entryData->fileType,
             'country' => !empty($entryData->country) ? $entryData->country : '',
             'region' => !empty($entryData->region) ? $entryData->region : '',
@@ -151,8 +150,8 @@ class PKPTemporaryItemRequestsDAO
                 ';
         }
 
-        $statsInstitutionDao = DAORegistry::getDAO('TemporaryInstitutionsDAO'); /* @var TemporaryInstitutionsDAO $statsInstitutionDao */
-        $institutionIds = $statsInstitutionDao->getInstitutionIdsByLoadId($loadId);
+        $temporaryInstitutionsDAO = DAORegistry::getDAO('TemporaryInstitutionsDAO'); /* @var TemporaryInstitutionsDAO $temporaryInstitutionsDAO */
+        $institutionIds = $temporaryInstitutionsDAO->getInstitutionIdsByLoadId($loadId);
         foreach ($institutionIds as $institutionId) {
             DB::statement($metricRequestsUniqueUpsertSql, [$loadId, Application::ASSOC_TYPE_SUBMISSION_FILE, (int) $institutionId]);
         }

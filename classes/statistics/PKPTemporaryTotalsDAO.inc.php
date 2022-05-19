@@ -35,48 +35,37 @@ abstract class PKPTemporaryTotalsDAO
 
     /**
      * Add the passed usage statistic record.
-     *
-     * @param object $entryData [
-     * 	issue_id
-     *  time
-     *  ip
-     *  canonicalURL
-     *  contextId
-     *  submissionId
-     *  representationId
-     *  assocType
-     *  assocId
-     *  fileType
-     *  userAgent
-     *  country
-     *  region
-     *  city
-     *  instituionIds
-     * ]
      */
     public function insert(object $entryData, int $lineNumber, string $loadId): void
     {
-        DB::table($this->table)->insert([
+        $insertData = $this->getInsertData($entryData);
+        $insertData['line_number'] = $lineNumber;
+        $insertData['load_id'] = $loadId;
+
+        DB::table($this->table)->insert($insertData);
+    }
+
+    /**
+     * Get Laravel optimized array of data to insert into the table based on the log entry
+     */
+    protected function getInsertData(object $entryData): array
+    {
+        return [
             'date' => $entryData->time,
             'ip' => $entryData->ip,
             'user_agent' => substr($entryData->userAgent, 0, 255),
-            'line_number' => $lineNumber,
             'canonical_url' => $entryData->canonicalUrl,
-            'issue_id' => property_exists($entryData, 'issueId') ? $entryData->issueId : null,
             'context_id' => $entryData->contextId,
             'submission_id' => $entryData->submissionId,
             'representation_id' => $entryData->representationId,
+            'submission_file_id' => $entryData->submissionFileId,
             'assoc_type' => $entryData->assocType,
-            'assoc_id' => $entryData->assocId,
             'file_type' => $entryData->fileType,
             'country' => !empty($entryData->country) ? $entryData->country : '',
             'region' => !empty($entryData->region) ? $entryData->region : '',
             'city' => !empty($entryData->city) ? $entryData->city : '',
-            'load_id' => $loadId,
-        ]);
+        ];
     }
-
-    abstract public function checkForeignKeys(object $entryData): array;
 
     /**
      * Delete all temporary records associated
@@ -111,16 +100,12 @@ abstract class PKPTemporaryTotalsDAO
     public function loadMetricsContext(string $loadId): void
     {
         DB::table('metrics_context')->where('load_id', '=', $loadId)->delete();
-        DB::statement(
-            "
-            INSERT INTO metrics_context (load_id, context_id, date, metric)
-                SELECT load_id, context_id, DATE(date) as date, count(*) as metric
-                FROM {$this->table}
-                WHERE load_id = ? AND assoc_type = ?
-                GROUP BY load_id, context_id, DATE(date)
-            ",
-            [$loadId, Application::getContextAssocType()]
-        );
+        $selectContextMetrics = DB::table($this->table)
+            ->select(DB::raw('load_id, context_id, DATE(date) as date, count(*) as metric'))
+            ->where('load_id', '=', $loadId)
+            ->where('assoc_type', '=', Application::getContextAssocType())
+            ->groupBy(DB::raw('load_id, context_id, DATE(date)'));
+        DB::table('metrics_context')->insertUsing(['load_id', 'context_id', 'date', 'metric'], $selectContextMetrics);
     }
 
     /**
@@ -129,36 +114,26 @@ abstract class PKPTemporaryTotalsDAO
     public function loadMetricsSubmission(string $loadId): void
     {
         DB::table('metrics_submission')->where('load_id', '=', $loadId)->delete();
-        DB::statement(
-            '
-            INSERT INTO metrics_submission (load_id, context_id, submission_id, assoc_type, date, metric)
-                SELECT load_id, context_id, submission_id, ' . Application::ASSOC_TYPE_SUBMISSION . ", DATE(date) as date, count(*) as metric
-                FROM {$this->table}
-                WHERE load_id = ? AND assoc_type = ?
-                GROUP BY load_id, context_id, submission_id, DATE(date)
-            ",
-            [$loadId, Application::ASSOC_TYPE_SUBMISSION]
-        );
-        DB::statement(
-            '
-            INSERT INTO metrics_submission (load_id, context_id, submission_id, representation_id, submission_file_id, file_type, assoc_type, date, metric)
-                SELECT load_id, context_id, submission_id, representation_id, assoc_id, file_type, ' . Application::ASSOC_TYPE_SUBMISSION_FILE . ", DATE(date) as date, count(*) as metric
-                FROM {$this->table}
-                WHERE load_id = ? AND assoc_type = ?
-                GROUP BY load_id, context_id, submission_id, representation_id, assoc_id, file_type, DATE(date)
-            ",
-            [$loadId, Application::ASSOC_TYPE_SUBMISSION_FILE]
-        );
-        DB::statement(
-            '
-            INSERT INTO metrics_submission (load_id, context_id, submission_id, representation_id, submission_file_id, file_type, assoc_type, date, metric)
-                SELECT load_id, context_id, submission_id, representation_id, assoc_id, file_type, ' . Application::ASSOC_TYPE_SUBMISSION_FILE_COUNTER_OTHER . ", DATE(date) as date, count(*) as metric
-                FROM {$this->table}
-                WHERE load_id = ? AND assoc_type = ?
-                GROUP BY load_id, context_id, submission_id, representation_id, assoc_id, file_type, DATE(date)
-            ",
-            [$loadId, Application::ASSOC_TYPE_SUBMISSION_FILE_COUNTER_OTHER]
-        );
+        $selectSubmissionMetrics = DB::table($this->table)
+            ->select(DB::raw('load_id, context_id, submission_id, assoc_type, DATE(date) as date, count(*) as metric'))
+            ->where('load_id', '=', $loadId)
+            ->where('assoc_type', '=', Application::ASSOC_TYPE_SUBMISSION)
+            ->groupBy(DB::raw('load_id, context_id, submission_id, DATE(date)'));
+        DB::table('metrics_submission')->insertUsing(['load_id', 'context_id', 'submission_id', 'assoc_type', 'date', 'metric'], $selectSubmissionMetrics);
+
+        $selectSubmissionFileMetrics = DB::table($this->table)
+            ->select(DB::raw('load_id, context_id, submission_id, representation_id, submission_file_id, file_type, assoc_type, DATE(date) as date, count(*) as metric'))
+            ->where('load_id', '=', $loadId)
+            ->where('assoc_type', '=', Application::ASSOC_TYPE_SUBMISSION_FILE)
+            ->groupBy(DB::raw('load_id, context_id, submission_id, representation_id, submission_file_id, file_type, DATE(date)'));
+        DB::table('metrics_submission')->insertUsing(['load_id', 'context_id', 'submission_id', 'representation_id', 'submission_file_id', 'file_type', 'assoc_type', 'date', 'metric'], $selectSubmissionFileMetrics);
+
+        $selectSubmissionSuppFileMetrics = DB::table($this->table)
+            ->select(DB::raw('load_id, context_id, submission_id, representation_id, submission_file_id, file_type, assoc_type, DATE(date) as date, count(*) as metric'))
+            ->where('load_id', '=', $loadId)
+            ->where('assoc_type', '=', Application::ASSOC_TYPE_SUBMISSION_FILE_COUNTER_OTHER)
+            ->groupBy(DB::raw('load_id, context_id, submission_id, representation_id, submission_file_id, file_type, DATE(date)'));
+        DB::table('metrics_submission')->insertUsing(['load_id', 'context_id', 'submission_id', 'representation_id', 'submission_file_id', 'file_type', 'assoc_type', 'date', 'metric'], $selectSubmissionSuppFileMetrics);
     }
 
     // For the DB tables that contain also the unique metrics, this deletion by loadId is in a separate function,
@@ -296,8 +271,8 @@ abstract class PKPTemporaryTotalsDAO
             ';
         }
 
-        $statsInstitutionDao = DAORegistry::getDAO('TemporaryInstitutionsDAO'); /* @var TemporaryInstitutionsDAO $statsInstitutionDao */
-        $institutionIds = $statsInstitutionDao->getInstitutionIdsByLoadId($loadId);
+        $temporaryInstitutionsDAO = DAORegistry::getDAO('TemporaryInstitutionsDAO'); /* @var TemporaryInstitutionsDAO $temporaryInstitutionsDAO */
+        $institutionIds = $temporaryInstitutionsDAO->getInstitutionIdsByLoadId($loadId);
         foreach ($institutionIds as $institutionId) {
             DB::statement($metricInvestigationsUpsertSql, [$loadId, (int) $institutionId]);
             DB::statement($metricRequestsUpsertSql, [$loadId, Application::ASSOC_TYPE_SUBMISSION_FILE, (int) $institutionId]);
