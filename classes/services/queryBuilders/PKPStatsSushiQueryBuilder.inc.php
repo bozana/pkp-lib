@@ -161,7 +161,7 @@ class PKPStatsSushiQueryBuilder extends PKPStatsQueryBuilder
     public function monthExists(string $month): bool
     {
         return DB::table('metrics_counter_submission_monthly as m')
-            ->where(StatisticsHelper::STATISTICS_DIMENSION_MONTH, $month)->exists();
+            ->where(StatisticsHelper::STATISTICS_DIMENSION_MONTH, (int) $month)->exists();
     }
 
     /**
@@ -183,8 +183,8 @@ class PKPStatsSushiQueryBuilder extends PKPStatsQueryBuilder
      */
     public function deleteMonthlyMetrics(string $month): void
     {
-        DB::table('metrics_counter_submission_monthly')->where('month', $month)->delete();
-        DB::table('metrics_counter_submission_institution_monthly')->where('month', $month)->delete();
+        DB::table('metrics_counter_submission_monthly')->where('month', (int) $month)->delete();
+        DB::table('metrics_counter_submission_institution_monthly')->where('month', (int) $month)->delete();
     }
 
     /**
@@ -194,8 +194,10 @@ class PKPStatsSushiQueryBuilder extends PKPStatsQueryBuilder
     {
         // Construct the SQL part depending on the DB
         $monthFormatSql = "DATE_FORMAT(csd.date, '%Y%m')";
+        $intCast = 'UNSIGNED';
         if (substr(Config::getVar('database', 'driver'), 0, strlen('postgres')) === 'postgres') {
             $monthFormatSql = "to_char(csd.date, 'YYYYMM')";
+            $intCast = 'integer';
         }
         // Get the application specific metrics columns
         $counterMetricsColumns = StatisticsHelper::getCounterMetricsColumns();
@@ -206,7 +208,7 @@ class PKPStatsSushiQueryBuilder extends PKPStatsQueryBuilder
         DB::statement(
             "
 			INSERT INTO metrics_counter_submission_monthly (context_id, submission_id, month, {$insertSql})
-			SELECT csd.context_id, csd.submission_id, {$monthFormatSql} as csdmonth, {$selectSql}
+			SELECT csd.context_id, csd.submission_id, CAST({$monthFormatSql} as csdmonth AS {$intCast}), {$selectSql}
             FROM metrics_counter_submission_daily csd
             WHERE {$monthFormatSql} = ? GROUP BY csd.context_id, csd.submission_id, csdmonth
 			",
@@ -215,7 +217,7 @@ class PKPStatsSushiQueryBuilder extends PKPStatsQueryBuilder
         DB::statement(
             "
 			INSERT INTO metrics_counter_submission_institution_monthly (context_id, submission_id, institution_id, month, {$insertSql})
-			SELECT csd.context_id, csd.submission_id, csd.institution_id, {$monthFormatSql} as csdmonth, {$selectSql}
+			SELECT csd.context_id, csd.submission_id, csd.institution_id, CAST({$monthFormatSql} as csdmonth AS {$intCast}, {$selectSql}
             FROM metrics_counter_submission_institution_daily csd
             WHERE {$monthFormatSql} = ? GROUP BY csd.context_id, csd.submission_id, csd.institution_id, csdmonth
 			",
