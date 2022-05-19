@@ -17,11 +17,14 @@
 namespace PKP\observers\events;
 
 use APP\core\Application;
-use APP\statistics\StatisticsHelper;
+use APP\core\Request;
+use APP\submission\Submission;
 use Illuminate\Foundation\Events\Dispatchable;
 use PKP\config\Config;
 use PKP\core\Core;
 use PKP\db\DAORegistry;
+use PKP\submission\Representation;
+use PKP\submissionFile\SubmissionFile;
 
 class PKPUsageEvent
 {
@@ -29,38 +32,33 @@ class PKPUsageEvent
 
     /** Current time */
     public string $time;
-    /** User IP adress */
-    public string $ip;
-    /** Canonical URL for the pub object */
-    public string $canonicalUrl;
-    /** Context ID */
-    public int $contextId;
-    /** Submission ID */
-    public ?int $submissionId;
-    /** Representation (galley or publication format) ID */
-    public ?int $representationId;
+
     /** Viewed/downloaded object, one of the Application::ASSOC_TYPE_... constants */
     public int $assocType;
-    /** Viewed/downloaded object ID */
-    public int $assocId;
-    /** COUNTER file type, one of the StatisticsHelper::STATISTICS_FILE_TYPE_... constants*/
-    public ?int $fileType;
-    /** User's UserAgent */
-    public string $userAgent;
+
+    /** Canonical URL for the pub object */
+    public string $canonicalUrl;
+
+    public Request $request;
+
+    public ?Submission $submission;
+
+    /** Representation (galley or publication format) */
+    public ?Representation $representation;
+
+    public ?SubmissionFile $submissionFile;
+
     /** Application's complete version string */
     public string $version;
 
     /**
      * Create a new usage event instance.
      */
-    public function __construct(int $assocType, int $assocId, int $contextId, int $submissionId = null, int $representationId = null, string $mimetype = null)
+    //public function __construct(Request $request, int $assocType, Submission? $submission, Representation? $publicationFormat, SubmissionFile? $submissionFile, Chapter? $chapter, Series? $series)
+    public function __construct(int $assocType, Submission $submission = null, Representation $representation = null, SubmissionFile $submissionFile = null)
     {
         $application = Application::get();
-        $request = $application->getRequest();
-
-        $time = Core::getCurrentDate();
-
-        $ip = $request->getRemoteAddr();
+        $this->request = $application->getRequest();
 
         $canonicalUrlPage = $canonicalUrlOp = null;
         $canonicalUrlParams = [];
@@ -69,10 +67,10 @@ class PKPUsageEvent
             case Application::ASSOC_TYPE_SUBMISSION_FILE_COUNTER_OTHER:
             case Application::ASSOC_TYPE_SUBMISSION_FILE:
                 $canonicalUrlOp = 'download';
-                $canonicalUrlParams = [$submissionId];
-                $router = $request->getRouter(); /** @var PageRouter $router */
-                $op = $router->getRequestedOp($request);
-                $args = $router->getRequestedArgs($request);
+                $canonicalUrlParams = [$submission->getId()];
+                $router = $this->request->getRouter(); /** @var PageRouter $router */
+                $op = $router->getRequestedOp($this->request);
+                $args = $router->getRequestedArgs($this->request);
                 if ($op == 'download' && count($args) > 1) {
                     if ($args[1] == 'version' && count($args) == 5) {
                         $publicationId = (int) $args[2];
@@ -80,18 +78,18 @@ class PKPUsageEvent
                         $canonicalUrlParams[] = $publicationId;
                     }
                 }
-                $canonicalUrlParams[] = $representationId;
-                $canonicalUrlParams[] = $assocId;
+                $canonicalUrlParams[] = $representation->getId();
+                $canonicalUrlParams[] = $submissionFile->getId();
                 break;
             case Application::ASSOC_TYPE_SUBMISSION:
                 $canonicalUrlOp = 'view';
                 if ($application->getName() == 'omp') {
                     $canonicalUrlOp = 'book';
                 }
-                $canonicalUrlParams = [$submissionId];
-                $router = $request->getRouter(); /** @var PageRouter $router */
-                $op = $router->getRequestedOp($request);
-                $args = $router->getRequestedArgs($request);
+                $canonicalUrlParams = [$submission->getId()];
+                $router = $this->request->getRouter(); /** @var PageRouter $router */
+                $op = $router->getRequestedOp($this->request);
+                $args = $router->getRequestedArgs($this->request);
                 if ($op == $canonicalUrlOp && count($args) > 1) {
                     if ($args[1] == 'version' && count($args) == 3) {
                         $publicationId = (int) $args[2];
@@ -105,37 +103,26 @@ class PKPUsageEvent
                 $canonicalUrlPage = 'index';
                 break;
         }
-        $canonicalUrl = $this->getCanonicalUrl($request, $canonicalUrlPage, $canonicalUrlOp, $canonicalUrlParams);
-
-        $fileType = null;
-        if (isset($mimetype)) {
-            $fileType = $this->getDocumentType($mimetype);
-        }
-
-        $userAgent = $request->getUserAgent();
+        $canonicalUrl = $this->getCanonicalUrl($this->request, $canonicalUrlPage, $canonicalUrlOp, $canonicalUrlParams);
 
         // Retrieve the currently installed version
         $versionDao = DAORegistry::getDAO('VersionDAO'); /** @var VersionDAO $versionDao */
         $version = $versionDao->getCurrentVersion();
         $versionString = $version->getVersionString();
 
-        $this->time = $time;
-        $this->ip = $ip;
-        $this->canonicalUrl = $canonicalUrl;
-        $this->contextId = $contextId;
-        $this->submissionId = $submissionId;
-        $this->representationId = $representationId;
+        $this->time = Core::getCurrentDate();
         $this->assocType = $assocType;
-        $this->assocId = $assocId;
-        $this->fileType = $fileType;
-        $this->userAgent = $userAgent;
+        $this->canonicalUrl = $canonicalUrl;
+        $this->submission = $submission;
+        $this->representation = $representation;
+        $this->submissionFile = $submissionFile;
         $this->version = $versionString;
     }
 
     /**
      * Get the canonical URL for the usage object
      */
-    protected function getCanonicalUrl(\APP\core\Request $request, string $canonicalUrlPage = null, string $canonicalUrlOp = null, array $canonicalUrlParams = null): string
+    protected function getCanonicalUrl(Request $request, string $canonicalUrlPage = null, string $canonicalUrlOp = null, array $canonicalUrlParams = null): string
     {
         $router = $request->getRouter(); /** @var PageRouter $router */
         $context = $router->getContext($request);
@@ -175,30 +162,5 @@ class PKPUsageEvent
             }
         }
         return $canonicalUrl;
-    }
-
-    /**
-    * Get document type based on the mimetype
-    * The mimetypes considered here are subset of those used in PKPFileService::getDocumentType()
-    *
-    * @return int One of the StatisticsHelper::STATISTICS_FILE_TYPE_ constants
-    */
-    private function getDocumentType(string $mimetype): int
-    {
-        switch ($mimetype) {
-           case 'application/pdf':
-           case 'application/x-pdf':
-           case 'text/pdf':
-           case 'text/x-pdf':
-               return StatisticsHelper::STATISTICS_FILE_TYPE_PDF;
-           case 'application/msword':
-           case 'application/word':
-           case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-               return StatisticsHelper::STATISTICS_FILE_TYPE_DOC;
-           case 'text/html':
-               return StatisticsHelper::STATISTICS_FILE_TYPE_HTML;
-           default:
-               return StatisticsHelper::STATISTICS_FILE_TYPE_OTHER;
-       }
     }
 }

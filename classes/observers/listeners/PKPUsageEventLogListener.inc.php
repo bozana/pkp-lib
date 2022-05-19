@@ -19,31 +19,55 @@ use APP\core\Application;
 use APP\facades\Repo;
 use APP\observers\events\UsageEvent;
 use APP\statistics\StatisticsHelper;
+use APP\submission\Submission;
 use GeoIp2\Database\Reader;
 use PKP\cache\CacheManager;
 use PKP\cache\FileCache;
 use PKP\file\PrivateFileManager;
+use PKP\plugins\HookRegistry;
 use Sokil\IsoCodes\IsoCodesFactory;
 
 class PKPUsageEventLogListener
 {
     public FileCache $geoDataCache;
+    public FileCache $institutionDataCache;
 
     /**
      * Handle the event.
      */
     public function handle(UsageEvent $usageEvent): void
     {
-        $usageEventArray = $this->prepareUsageEvent($usageEvent);
-        $this->logUsageEvent($usageEventArray);
+        if ($usageEvent->request->isDNTSet()) {
+            return;
+        }
+
+        if (in_array($usageEvent->assocType, [Application::ASSOC_TYPE_ISSUE, Application::ASSOC_TYPE_ISSUE_GALLEY]) &&
+            !$usageEvent->issue->getPublished()) {
+            return;
+        }
+
+        if (in_array($usageEvent->assocType, [
+            Application::ASSOC_TYPE_SUBMISSION,
+            Application::ASSOC_TYPE_SUBMISSION_FILE,
+            Application::ASSOC_TYPE_SUBMISSION_FILE_COUNTER_OTHER,
+            //Application::ASSOC_TYPE_CHAPTER
+        ]) &&
+            $usageEvent->submission->getData('status') != Submission::STATUS_PUBLISHED) {
+            return;
+        }
+
+        $usageEventLogEntry = $this->prepareUsageEvent($usageEvent);
+        $this->logUsageEvent($usageEventLogEntry);
     }
 
     /**
      * Log the usage event
      */
-    public function logUsageEvent(array $usageEventArray): void
+    protected function logUsageEvent(array $usageEventLogEntry): void
     {
-        $usageEventLogEntry = json_encode($usageEventArray) . PHP_EOL;
+        HookRegistry::call('Stats::logUsageEvent', [$usageEventLogEntry]);
+
+        $usageEventLogEntry = json_encode($usageEventLogEntry) . PHP_EOL;
 
         // Log file name (from the current day)
         $logFileName = $this->getUsageEventLogFileName();
@@ -55,8 +79,7 @@ class PKPUsageEventLogListener
             fwrite($fp, $usageEventLogEntry);
             flock($fp, LOCK_UN);
         } else {
-            // Couldn't lock the file.
-            assert(false);
+            fatalError("PKPUsageEventLogListener: Couldn't lock the usage event log file.");
         }
         fclose($fp);
     }
@@ -70,18 +93,119 @@ class PKPUsageEventLogListener
      */
     protected function prepareUsageEvent(UsageEvent $usageEvent): array
     {
-        $usageEventArray = (array) $usageEvent;
+        $request = $usageEvent->request;
 
         // The current usage event log file name (from the current day)
         $logFileName = $this->getUsageEventLogFileName();
 
         // Salt management.
+        [$salt, $flushCache] = $this->getSalt($logFileName);
+
+        // Hash the IP
+        $ip = $request->getRemoteAddr();
+        $hashedIp = $this->hashIp($ip, $salt);
+        // Never store unhashed IPs!
+        if ($hashedIp === null) {
+            fatalError('PKPUsageEventLogListener: the IP cound not be hashed.');
+        }
+
+        $site = $request->getSite();
+        $context = $request->getContext();
+        $enableGeoUsageStats = $site->getData('enableGeoUsageStats');
+        if (($enableGeoUsageStats != 'disabled') && ($context->getData('enableGeoUsageStats') !== null) && ($context->getData('enableGeoUsageStats') != $site->getData('enableGeoUsageStats'))) {
+            $enableGeoUsageStats = $context->getData('enableGeoUsageStats');
+        }
+        // Geo data
+        $country = $region = $city = null;
+        if ($enableGeoUsageStats != 'disabled') {
+            $geoIPArray = $this->getLocation($ip, $hashedIp, $flushCache);
+            $country = $geoIPArray['country'];
+            if ($enableGeoUsageStats == 'country+region+city' || $enableGeoUsageStats == 'country+region') {
+                $region = $geoIPArray['region'];
+                if ($enableGeoUsageStats == 'country+region+city') {
+                    $city = $geoIPArray['city'];
+                }
+            }
+        }
+
+        // institutions IDs
+        $institutionIds = [];
+        if ($context->isInstitutionStatsEnabled($site)) {
+            $institutionIds = $this->getInstitutionIds($context->getId(), $ip, $hashedIp, $flushCache);
+        }
+
+        // format the usage event log entry
+        $usageEventLogEntry = [
+            'time' => $usageEvent->time,
+            'ip' => $hashedIp,
+            'userAgent' => $request->getUserAgent(),
+            'canonicalUrl' => $usageEvent->canonicalUrl,
+            'assocType' => $usageEvent->assocType,
+            'contextId' => $context->getId(),
+            'submissionId' => $usageEvent->submission?->getId(),
+            'representationId' => $usageEvent->representation?->getId(),
+            'submissionFileId' => $usageEvent->submissionFile?->getId(),
+            'fileType' => $usageEvent->submissionFile ? $this->getDocumentType($usageEvent->submissionFile->getData('mimetype')) : null,
+            'country' => $country,
+            'region' => $region,
+            'city' => $city,
+            'institutionIds' => $institutionIds,
+        ];
+        // get application specific IDs
+        if (Application::get()->getName() == 'ojs2') {
+            $usageEventLogEntry['issueId'] = $usageEvent->issue?->getId();
+            $usageEventLogEntry['issueGalleyId'] = $usageEvent->issueGalley?->getId();
+        } elseif (Application::get()->getName() == 'omp') {
+            $usageEventLogEntry['chapterId'] = $usageEvent->chapter?->getId();
+            $usageEventLogEntry['seriesId'] = $usageEvent->series?->getId();
+        }
+        return $usageEventLogEntry;
+    }
+
+    /**
+     * Get the path to the Geo DB file.
+     */
+    protected function getGeoDBPath(): string
+    {
+        return StatisticsHelper::getUsageStatsDirPath() . '/IPGeoDB.mmdb';
+    }
+
+    /**
+     * Get the path to the salt file.
+     */
+    protected function getSaltFileName(): string
+    {
+        return StatisticsHelper::getUsageStatsDirPath() . '/salt';
+    }
+
+    /**
+     * Get current day usage event log file name.
+     */
+    protected function getUsageEventLogFileName(): string
+    {
+        $usageEventLogsDir = StatisticsHelper::getUsageStatsDirPath() . '/usageEventLogs';
+        if (!file_exists($usageEventLogsDir) || !is_dir($usageEventLogsDir)) {
+            $fileMgr = new PrivateFileManager();
+            $success = $fileMgr->mkdirtree($usageEventLogsDir);
+            if (!$success) {
+                // Files directory wrong configuration?
+                fatalError("PKPUsageEventLogListener: Couldn't create {$usageEventLogsDir}.");
+            }
+        }
+        return $usageEventLogsDir . '/usage_events_' . date('Ymd') . '.log';
+    }
+
+    /**
+     * Get salt
+     */
+    protected function getSalt(string $logFileName): array
+    {
         $salt = null;
         $flushCache = false;
         $saltFileName = $this->getSaltFileName();
         // Create salt file and salt for the first time
         if (!file_exists($saltFileName)) {
-            $salt = $this->_createNewSalt($saltFileName);
+            $salt = $this->createNewSalt($saltFileName);
             // Salt changed, flush the cache
             $flushCache = true;
         }
@@ -92,7 +216,7 @@ class PKPUsageEventLogListener
         // If another process accesses this before the current usage event log file is created,
         // consider the last modified date stamp of the salt file too.
         if (!file_exists($logFileName) && ($currentDate != $saltFileLastModified)) {
-            $salt = $this->_createNewSalt($saltFileName);
+            $salt = $this->createNewSalt($saltFileName);
             // Salt changed, flush the cache
             $flushCache = true;
         }
@@ -101,80 +225,13 @@ class PKPUsageEventLogListener
             $salt = trim(file_get_contents($saltFileName));
         }
 
-        // Hash the IP
-        $ip = $usageEventArray['ip'];
-        $hashedIp = $this->_hashIp($ip, $salt);
-        // Never store unhashed IPs!
-        if ($hashedIp === null) {
-            assert(false);
-        }
-        $usageEventArray['ip'] = $hashedIp;
-
-        $site = Application::get()->getRequest()->getSite();
-        $context = Application::get()->getRequest()->getContext();
-        $enableGeoUsageStats = $site->getData('enableGeoUsageStats');
-        if (($enableGeoUsageStats != 'disabled') && ($context->getData('enableGeoUsageStats') !== null) && ($context->getData('enableGeoUsageStats') != $site->getData('enableGeoUsageStats'))) {
-            $enableGeoUsageStats = $context->getData('enableGeoUsageStats');
-        }
-        // Geo data
-        $usageEventArray['country'] = $usageEventArray['region'] = $usageEventArray['city'] = null;
-        if ($enableGeoUsageStats != 'disabled') {
-            $geoIPArray = $this->_getCachedIPLocation($ip, $hashedIp, $flushCache);
-            $usageEventArray['country'] = $geoIPArray['country'];
-            if ($enableGeoUsageStats == 'country+region') {
-                $usageEventArray['region'] = $geoIPArray['region'];
-                if ($enableGeoUsageStats == 'country+region+city') {
-                    $usageEventArray['city'] = $geoIPArray['city'];
-                }
-            }
-        }
-
-        // institutions IDs
-        $usageEventArray['institutionIds'] = [];
-        if ($context->isInstitutionStatsEnabled($site)) {
-            $institutionIds = Repo::institution()->getIds(Repo::institution()->getCollector()->filterByContextIds([$usageEventArray['contextId']])->filterByIps([$ip]));
-            $usageEventArray['institutionIds'] = $institutionIds;
-        }
-        return $usageEventArray;
-    }
-
-    /**
-     * Get the path to the Geo DB file.
-     */
-    public function getGeoDBPath(): string
-    {
-        return StatisticsHelper::getUsageStatsDirPath() . '/IPGeoDB.mmdb';
-    }
-
-    /**
-     * Get the path to the salt file.
-     */
-    public function getSaltFileName(): string
-    {
-        return StatisticsHelper::getUsageStatsDirPath() . '/salt';
-    }
-
-    /**
-     * Get current day usage event log file name.
-     */
-    public function getUsageEventLogFileName(): string
-    {
-        $usageEventLogsDir = StatisticsHelper::getUsageStatsDirPath() . '/usageEventLogs';
-        if (!file_exists($usageEventLogsDir) || !is_dir($usageEventLogsDir)) {
-            $fileMgr = new PrivateFileManager();
-            $success = $fileMgr->mkdirtree($usageEventLogsDir);
-            if (!$success) {
-                // Files directory wrong configuration?
-                assert(false);
-            }
-        }
-        return $usageEventLogsDir . '/usage_events_' . date('Ymd') . '.log';
+        return [$salt, $flushCache];
     }
 
     /**
      * Create a new salt, write it to the salt file and return it
      */
-    public function _createNewSalt(string $saltFileName): string
+    protected function createNewSalt(string $saltFileName): string
     {
         if (function_exists('mcrypt_create_iv')) {
             $newSalt = bin2hex(mcrypt_create_iv(16, MCRYPT_DEV_URANDOM | MCRYPT_RAND));
@@ -197,7 +254,7 @@ class PKPUsageEventLogListener
     * We just do not implement the PHP4 part as OJS dropped PHP4 support.
     *
     */
-    public function _hashIp(string $ip, string $salt): ?string
+    protected function hashIp(string $ip, string $salt): ?string
     {
         $hashedIp = null;
         if (function_exists('mhash')) {
@@ -212,7 +269,43 @@ class PKPUsageEventLogListener
     }
 
     /**
-     * Get cached IP location.
+     * Get institution IDs for a given context based on the IP, use cache if exists.
+     *
+     * @param string $contextId Context ID
+     * @param string $ip User IP
+     * @param string $hashedIp Hashed user IP
+     * @param bool $flush If true empty cache
+     *
+     * @return array Cached Geo data
+     *  [
+     *   hashedIP => contextId => institutionIds[]
+     *  ]
+     *
+     */
+    protected function getInstitutionIds(int $contextId, string $ip, string $hashedIp, bool $flush): array
+    {
+        if (!isset($this->institutionDataCache)) {
+            $institutionCacheManager = CacheManager::getManager();
+            $this->institutionDataCache = $institutionCacheManager->getCache('institutionIP', 'all', [&$this, 'institutionDataCacheMiss']);
+        }
+
+        if ($flush) {
+            // Salt and thus hashed IPs changed, empty the cache.
+            $this->institutionDataCacheMiss($this->institutionDataCache, 'ID');
+        }
+
+        $cachedInstitutionData = $this->institutionDataCache->getContents();
+        if (array_key_exists($hashedIp, $cachedInstitutionData) && array_key_exists($contextId, $cachedInstitutionData[$hashedIp])) {
+            return $cachedInstitutionData[$hashedIp][$contextId];
+        }
+        $institutionIds = Repo::institution()->getIds(Repo::institution()->getCollector()->filterByContextIds([$contextId])->filterByIps([$ip]))->toArray();
+        $cachedInstitutionData[$hashedIp][$contextId] = $institutionIds;
+        $this->institutionDataCache->setEntireCache($cachedInstitutionData);
+        return $cachedInstitutionData[$hashedIp][$contextId];
+    }
+
+    /**
+     * Get location based on the IP, use cache if exists.
      *
      * @param string $ip User IP
      * @param string $hashedIp Hashed user IP
@@ -228,8 +321,9 @@ class PKPUsageEventLogListener
      *  ]
      *
      */
-    public function _getCachedIPLocation(string $ip, string $hashedIp, bool $flush): array
+    protected function getLocation(string $ip, string $hashedIp, bool $flush): array
     {
+        $ip = '142.58.100.60';
         if (!isset($this->geoDataCache)) {
             $geoCacheManager = CacheManager::getManager();
             $this->geoDataCache = $geoCacheManager->getCache('geoIP', 'all', [&$this, 'geoDataCacheMiss']);
@@ -241,52 +335,63 @@ class PKPUsageEventLogListener
         }
 
         $cachedGeoData = $this->geoDataCache->getContents();
-        if (!array_key_exists($hashedIp, $cachedGeoData)) {
-            $reader = $countryIsoCode = $regionIsoCode = $cityName = null;
+        if (array_key_exists($hashedIp, $cachedGeoData)) {
+            return $cachedGeoData[$hashedIp];
+        }
+
+        $reader = $countryIsoCode = $regionIsoCode = $cityName = null;
+        try {
+            $reader = new Reader($this->getGeoDBPath());
+        } catch (\MaxMind\Db\Reader\InvalidDatabaseException $e) {
+            error_log('There was a problem reading the Geo database at ' . $this->getGeoDBPath() . '. Error: ' . $e->getMessage());
+        }
+        if (isset($reader)) {
             try {
-                $reader = new Reader($this->getGeoDBPath());
-            } catch (\MaxMind\Db\Reader\InvalidDatabaseException $e) {
-                error_log('MaxMind DB Reader InvalidDatabaseException: the Geo database is corrupt or invalid');
-            }
-            if (isset($reader)) {
-                try {
-                    $geoIPRecord = $reader->city($ip);
-                    $countryIsoCode = $geoIPRecord->country->isoCode;
-                    // When found, up to three characters long subdivision portion of the ISO 3166-2 code is returned
-                    // s. https://github.com/maxmind/GeoIP2-php/blob/main/src/Record/Subdivision.php#L20
-                    $regionIsoCode = $geoIPRecord->mostSpecificSubdivision->isoCode;
-                    // DB-IP IP to City Lite database does not provide region Iso code but name,
-                    // thus try to get the region Iso code by the name,
-                    // but we need country for that
-                    if (!isset($regionIsoCode) && isset($countryIsoCode)) {
-                        $regionName = $geoIPRecord->mostSpecificSubdivision->name;
-                        if (isset($regionName)) {
-                            $isoCodes = app(IsoCodesFactory::class);
-                            $allCountryRegions = $isoCodes->getSubdivisions()->getAllByCountryCode($countryIsoCode);
-                            foreach ($allCountryRegions as $countryRegion) {
-                                if ($countryRegion->getName() == $regionName) {
-                                    $regionIsoCodeArray = explode('-', $countryRegion->getCode());
-                                    $regionIsoCode = $regionIsoCodeArray[1];
-                                    break;
-                                }
+                $geoIPRecord = $reader->city($ip);
+                $countryIsoCode = $geoIPRecord->country->isoCode;
+                // When found, up to three characters long subdivision portion of the ISO 3166-2 code is returned
+                // s. https://github.com/maxmind/GeoIP2-php/blob/main/src/Record/Subdivision.php#L20
+                $regionIsoCode = $geoIPRecord->mostSpecificSubdivision->isoCode;
+                // DB-IP IP to City Lite database does not provide region Iso code but name,
+                // thus try to get the region Iso code by the name,
+                // but we need country for that
+                if (!isset($regionIsoCode) && isset($countryIsoCode)) {
+                    $regionName = $geoIPRecord->mostSpecificSubdivision->name;
+                    if (isset($regionName)) {
+                        $isoCodes = app(IsoCodesFactory::class);
+                        $allCountryRegions = $isoCodes->getSubdivisions()->getAllByCountryCode($countryIsoCode);
+                        foreach ($allCountryRegions as $countryRegion) {
+                            if ($countryRegion->getName() == $regionName) {
+                                $regionIsoCodeArray = explode('-', $countryRegion->getCode());
+                                $regionIsoCode = $regionIsoCodeArray[1];
+                                break;
                             }
                         }
                     }
-                    $cityName = $geoIPRecord->city->name;
-                } catch (\BadMethodCallException $e) {
-                    error_log('BadMethodCallException: city method cannot be used to open this Geo database');
-                } catch (\GeoIp2\Exception\AddressNotFoundException $e) {
-                    error_log('GeoIp2 AddressNotFoundException: the IP address is not in the Geo database');
-                } catch (\MaxMind\Db\Reader\InvalidDatabaseException $e) {
-                    error_log('MaxMind DB Reader InvalidDatabaseException: the Geo database is corrupt or invalid');
                 }
+                $cityName = $geoIPRecord->city->name;
+            } catch (\BadMethodCallException $e) {
+                error_log('There was a problem using city method on the Geo database at ' . $this->getGeoDBPath() . '. Error: ' . $e->getMessage());
+            } catch (\GeoIp2\Exception\AddressNotFoundException $e) {
+                error_log('There was a problem finding IP in the Geo database at ' . $this->getGeoDBPath() . '. Error: ' . $e->getMessage());
+            } catch (\MaxMind\Db\Reader\InvalidDatabaseException $e) {
+                error_log('There was a problem reading the Geo database at ' . $this->getGeoDBPath() . '. Error: ' . $e->getMessage());
             }
-            $cachedGeoData[$hashedIp]['country'] = $countryIsoCode;
-            $cachedGeoData[$hashedIp]['region'] = $regionIsoCode;
-            $cachedGeoData[$hashedIp]['city'] = $cityName;
-            $this->geoDataCache->setEntireCache($cachedGeoData);
         }
+        $cachedGeoData[$hashedIp]['country'] = $countryIsoCode;
+        $cachedGeoData[$hashedIp]['region'] = $regionIsoCode;
+        $cachedGeoData[$hashedIp]['city'] = $cityName;
+        $this->geoDataCache->setEntireCache($cachedGeoData);
         return $cachedGeoData[$hashedIp];
+    }
+
+    /**
+    * Institution cache miss callback.
+    */
+    public function institutionDataCacheMiss(FileCache $cache): array
+    {
+        $cache->setEntireCache([]);
+        return [];
     }
 
     /**
@@ -294,8 +399,32 @@ class PKPUsageEventLogListener
     */
     public function geoDataCacheMiss(FileCache $cache): array
     {
-        $geoData = [];
-        $cache->setEntireCache($geoData);
-        return $geoData;
+        $cache->setEntireCache([]);
+        return [];
+    }
+
+    /**
+    * Get document type based on the mimetype
+    * The mimetypes considered here are subset of those used in PKPFileService::getDocumentType()
+    *
+    * @return int One of the StatisticsHelper::STATISTICS_FILE_TYPE_ constants
+    */
+    protected function getDocumentType(string $mimetype): int
+    {
+        switch ($mimetype) {
+           case 'application/pdf':
+           case 'application/x-pdf':
+           case 'text/pdf':
+           case 'text/x-pdf':
+               return StatisticsHelper::STATISTICS_FILE_TYPE_PDF;
+           case 'application/msword':
+           case 'application/word':
+           case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+               return StatisticsHelper::STATISTICS_FILE_TYPE_DOC;
+           case 'text/html':
+               return StatisticsHelper::STATISTICS_FILE_TYPE_HTML;
+           default:
+               return StatisticsHelper::STATISTICS_FILE_TYPE_OTHER;
+       }
     }
 }
