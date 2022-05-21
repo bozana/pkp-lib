@@ -1,20 +1,20 @@
 <?php
 
 /**
- * @file classes/observers/events/PKPUsageEvent.inc.php
+ * @file classes/observers/events/UsageEvent.inc.php
  *
  * Copyright (c) 2014-2021 Simon Fraser University
  * Copyright (c) 2000-2021 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
- * @class PKPUsageEvent
- * @ingroup observers_events
+ * @class UsageEvent
+ * @ingroup observers_traits
  *
- * @brief Usage event.
+ * @brief Usage event trait.
  *
  */
 
-namespace PKP\observers\events;
+namespace PKP\observers\traits;
 
 use APP\core\Application;
 use APP\core\Request;
@@ -26,7 +26,7 @@ use PKP\db\DAORegistry;
 use PKP\submission\Representation;
 use PKP\submissionFile\SubmissionFile;
 
-class PKPUsageEvent
+trait UsageEvent
 {
     use Dispatchable;
 
@@ -55,7 +55,7 @@ class PKPUsageEvent
      * Create a new usage event instance.
      */
     //public function __construct(Request $request, int $assocType, Submission? $submission, Representation? $publicationFormat, SubmissionFile? $submissionFile, Chapter? $chapter, Series? $series)
-    public function __construct(int $assocType, Submission $submission = null, Representation $representation = null, SubmissionFile $submissionFile = null)
+    protected function constructUsageEvent(int $assocType, Submission $submission = null, Representation $representation = null, SubmissionFile $submissionFile = null)
     {
         $application = Application::get();
         $this->request = $application->getRequest();

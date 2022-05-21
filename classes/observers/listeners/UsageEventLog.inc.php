@@ -1,33 +1,35 @@
 <?php
 
 /**
- * @file classes/observers/listeners/PKPUsageEventLogListener.inc.php
+ * @file classes/observers/listeners/UsageEventLog.inc.php
  *
  * Copyright (c) 2014-2021 Simon Fraser University
  * Copyright (c) 2000-2021 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
- * @class PKPUsageEventLogListener
- * @ingroup observers_listeners
+ * @class UsageEventLog
+ * @ingroup observers_traits
  *
- * @brief Listener listening for the usage events.
+ * @brief Listener listening for and logging the usage events.
  */
 
 namespace PKP\observers\listeners;
 
 use APP\core\Application;
 use APP\facades\Repo;
-use APP\observers\events\UsageEvent;
+use APP\observers\events\Usage;
 use APP\statistics\StatisticsHelper;
 use APP\submission\Submission;
 use GeoIp2\Database\Reader;
 use PKP\cache\CacheManager;
 use PKP\cache\FileCache;
+use PKP\context\Context;
 use PKP\file\PrivateFileManager;
 use PKP\plugins\HookRegistry;
+use PKP\site\Site;
 use Sokil\IsoCodes\IsoCodesFactory;
 
-class PKPUsageEventLogListener
+class UsageEventLog
 {
     public FileCache $geoDataCache;
     public FileCache $institutionDataCache;
@@ -35,29 +37,46 @@ class PKPUsageEventLogListener
     /**
      * Handle the event.
      */
-    public function handle(UsageEvent $usageEvent): void
+    public function handle(Usage $usageEvent): void
     {
-        if ($usageEvent->request->isDNTSet()) {
+        if (!$this->canHandle($usageEvent)) {
             return;
         }
 
-        if (in_array($usageEvent->assocType, [Application::ASSOC_TYPE_ISSUE, Application::ASSOC_TYPE_ISSUE_GALLEY]) &&
-            !$usageEvent->issue->getPublished()) {
-            return;
+        $usageEventLogEntry = $this->prepareUsageEvent($usageEvent);
+        $this->logUsageEvent($usageEventLogEntry);
+    }
+
+    /**
+     * Shall this event be processed here
+     */
+    protected function canHandle(Usage $usageEvent): bool
+    {
+        if ($usageEvent->request->isDNTSet()) {
+            return false;
         }
 
         if (in_array($usageEvent->assocType, [
             Application::ASSOC_TYPE_SUBMISSION,
             Application::ASSOC_TYPE_SUBMISSION_FILE,
             Application::ASSOC_TYPE_SUBMISSION_FILE_COUNTER_OTHER,
-            //Application::ASSOC_TYPE_CHAPTER
-        ]) &&
-            $usageEvent->submission->getData('status') != Submission::STATUS_PUBLISHED) {
-            return;
+        ]) && $usageEvent->submission->getData('status') != Submission::STATUS_PUBLISHED) {
+            return false;
         }
 
-        $usageEventLogEntry = $this->prepareUsageEvent($usageEvent);
-        $this->logUsageEvent($usageEventLogEntry);
+        if (Application::get()->getName() == 'ojs2') {
+            if (in_array($usageEvent->assocType, [Application::ASSOC_TYPE_ISSUE, Application::ASSOC_TYPE_ISSUE_GALLEY]) &&
+                !$usageEvent->issue->getPublished()) {
+                return false;
+            }
+        } elseif (Application::get()->getName() == 'omp') {
+            if (in_array($usageEvent->assocType, [Application::ASSOC_TYPE_CHAPTER]) &&
+                $usageEvent->submission->getData('status') != Submission::STATUS_PUBLISHED) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -79,7 +98,7 @@ class PKPUsageEventLogListener
             fwrite($fp, $usageEventLogEntry);
             flock($fp, LOCK_UN);
         } else {
-            fatalError("PKPUsageEventLogListener: Couldn't lock the usage event log file.");
+            error_log("UsageEventLog: Couldn't lock the usage event log file.");
         }
         fclose($fp);
     }
@@ -91,7 +110,7 @@ class PKPUsageEventLogListener
      *  get institution IDs, if needed
      *  hash the IP
      */
-    protected function prepareUsageEvent(UsageEvent $usageEvent): array
+    protected function prepareUsageEvent(Usage $usageEvent): array
     {
         $request = $usageEvent->request;
 
@@ -104,29 +123,15 @@ class PKPUsageEventLogListener
         // Hash the IP
         $ip = $request->getRemoteAddr();
         $hashedIp = $this->hashIp($ip, $salt);
-        // Never store unhashed IPs!
         if ($hashedIp === null) {
-            fatalError('PKPUsageEventLogListener: the IP cound not be hashed.');
+            error_log('UsageEventLog: the IP cound not be hashed.');
         }
 
         $site = $request->getSite();
         $context = $request->getContext();
-        $enableGeoUsageStats = $site->getData('enableGeoUsageStats');
-        if (($enableGeoUsageStats != 'disabled') && ($context->getData('enableGeoUsageStats') !== null) && ($context->getData('enableGeoUsageStats') != $site->getData('enableGeoUsageStats'))) {
-            $enableGeoUsageStats = $context->getData('enableGeoUsageStats');
-        }
+
         // Geo data
-        $country = $region = $city = null;
-        if ($enableGeoUsageStats != 'disabled') {
-            $geoIPArray = $this->getLocation($ip, $hashedIp, $flushCache);
-            $country = $geoIPArray['country'];
-            if ($enableGeoUsageStats == 'country+region+city' || $enableGeoUsageStats == 'country+region') {
-                $region = $geoIPArray['region'];
-                if ($enableGeoUsageStats == 'country+region+city') {
-                    $city = $geoIPArray['city'];
-                }
-            }
-        }
+        [$country, $region, $city] = $this->getGeoData($site, $context, $ip, $hashedIp, $flushCache);
 
         // institutions IDs
         $institutionIds = [];
@@ -189,7 +194,7 @@ class PKPUsageEventLogListener
             $success = $fileMgr->mkdirtree($usageEventLogsDir);
             if (!$success) {
                 // Files directory wrong configuration?
-                fatalError("PKPUsageEventLogListener: Couldn't create {$usageEventLogsDir}.");
+                error_log("UsageEventLog: Couldn't create {$usageEventLogsDir}.");
             }
         }
         return $usageEventLogsDir . '/usage_events_' . date('Ymd') . '.log';
@@ -305,6 +310,39 @@ class PKPUsageEventLogListener
     }
 
     /**
+    * Institution cache miss callback.
+    */
+    public function institutionDataCacheMiss(FileCache $cache): array
+    {
+        $cache->setEntireCache([]);
+        return [];
+    }
+
+    /**
+     * Retrieve Geo data (country, region, city) using IP and based on the site i.e. context settings
+     */
+    protected function getGeoData(Site $site, Context $context, string $ip, string $hashedIp, bool $flushCache): array
+    {
+        $enableGeoUsageStats = $site->getData('enableGeoUsageStats');
+        if (($enableGeoUsageStats != 'disabled') && ($context->getData('enableGeoUsageStats') !== null) && ($context->getData('enableGeoUsageStats') != $site->getData('enableGeoUsageStats'))) {
+            $enableGeoUsageStats = $context->getData('enableGeoUsageStats');
+        }
+
+        $country = $region = $city = null;
+        if ($enableGeoUsageStats != 'disabled') {
+            $geoIPArray = $this->getLocation($ip, $hashedIp, $flushCache);
+            $country = $geoIPArray['country'];
+            if ($enableGeoUsageStats == 'country+region+city' || $enableGeoUsageStats == 'country+region') {
+                $region = $geoIPArray['region'];
+                if ($enableGeoUsageStats == 'country+region+city') {
+                    $city = $geoIPArray['city'];
+                }
+            }
+        }
+        return [$country, $region, $city];
+    }
+
+    /**
      * Get location based on the IP, use cache if exists.
      *
      * @param string $ip User IP
@@ -383,15 +421,6 @@ class PKPUsageEventLogListener
         $cachedGeoData[$hashedIp]['city'] = $cityName;
         $this->geoDataCache->setEntireCache($cachedGeoData);
         return $cachedGeoData[$hashedIp];
-    }
-
-    /**
-    * Institution cache miss callback.
-    */
-    public function institutionDataCacheMiss(FileCache $cache): array
-    {
-        $cache->setEntireCache([]);
-        return [];
     }
 
     /**
