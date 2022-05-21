@@ -36,13 +36,13 @@ abstract class PKPTemporaryTotalsDAO
     /**
      * Add the passed usage statistic record.
      */
-    public function insert(object $entryData, int $lineNumber, string $loadId): void
+    public function insert(object $entryData, int $lineNumber, string $loadId): bool
     {
         $insertData = $this->getInsertData($entryData);
         $insertData['line_number'] = $lineNumber;
         $insertData['load_id'] = $loadId;
 
-        DB::table($this->table)->insert($insertData);
+        return DB::table($this->table)->insert($insertData);
     }
 
     /**

@@ -31,9 +31,9 @@ class PKPTemporaryItemInvestigationsDAO
     /**
      * Add the passed usage statistic record.
      */
-    public function insert(object $entryData, int $lineNumber, string $loadId): void
+    public function insert(object $entryData, int $lineNumber, string $loadId): bool
     {
-        DB::table($this->table)->insert([
+        return DB::table($this->table)->insert([
             'date' => $entryData->time,
             'ip' => $entryData->ip,
             'user_agent' => substr($entryData->userAgent, 0, 255),
