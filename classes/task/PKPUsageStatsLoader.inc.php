@@ -20,9 +20,14 @@ use APP\core\Services;
 use APP\Jobs\Statistics\LoadMetricsDataJob;
 use APP\Jobs\Statistics\LoadMonthlyMetricsDataJob;
 use APP\statistics\StatisticsHelper;
+use APP\statistics\TemporaryItemInvestigationsDAO;
+use APP\statistics\TemporaryItemRequestsDAO;
+use APP\statistics\TemporaryTotalsDAO;
 use PKP\core\Core;
+use PKP\db\DAORegistry;
 use PKP\file\FileManager;
 use PKP\scheduledTask\ScheduledTaskHelper;
+use PKP\statistics\TemporaryInstitutionsDAO;
 
 abstract class PKPUsageStatsLoader extends FileLoader
 {
@@ -35,6 +40,12 @@ abstract class PKPUsageStatsLoader extends FileLoader
 
     /** List of months the processed daily log files are from, to consider for monthly aggregation */
     private array $months = [];
+
+    /** DAOs for temporary usage stats tables where the log entries are inserted for further processing */
+    protected TemporaryInstitutionsDAO $temporaryInstitutionsDao;
+    protected TemporaryTotalsDAO $temporaryTotalsDao;
+    protected TemporaryItemInvestigationsDAO $temporaryItemInvestigationsDao;
+    protected TemporaryItemRequestsDAO $temporaryItemRequestsDao;
 
     /**
      * Constructor.
@@ -64,6 +75,11 @@ abstract class PKPUsageStatsLoader extends FileLoader
         parent::__construct($args);
 
         $this->checkFolderStructure(true);
+
+        $this->temporaryInstitutionsDao = DAORegistry::getDAO('TemporaryInstitutionsDAO'); /* @var TemporaryInstitutionsDAO $statsInstitutionDao */
+        $this->temporaryTotalsDao = DAORegistry::getDAO('TemporaryTotalsDAO'); /* @var TemporaryTotalsDAO $temporaryTotalsDao */
+        $this->temporaryItemInvestigationsDao = DAORegistry::getDAO('TemporaryItemInvestigationsDAO'); /* @var TemporaryItemInvestigationsDAO $temporaryItemInvestigationsDao */
+        $this->temporaryItemRequestsDao = DAORegistry::getDAO('TemporaryItemRequestsDAO'); /* @var TemporaryItemRequestsDAO $temporaryItemRequestsDao */
     }
 
     /**
@@ -103,19 +119,40 @@ abstract class PKPUsageStatsLoader extends FileLoader
     /**
      * Delete entries in usage stats temporary tables by loadId
      */
-    abstract protected function deleteByLoadId(string $loadId): void;
+    protected function deleteByLoadId(string $loadId): void
+    {
+        $this->temporaryInstitutionsDao->deleteByLoadId($loadId);
+        $this->temporaryTotalsDao->deleteByLoadId($loadId);
+        $this->temporaryItemInvestigationsDao->deleteByLoadId($loadId);
+        $this->temporaryItemRequestsDao->deleteByLoadId($loadId);
+    }
+
     /**
      * Insert usage stats log entry into temporary tables
      */
-    abstract protected function insertTemporaryUsageStatsData(object $entry, int $lineNumber, string $loadId): void;
-    /**
-     * Check foreign keys from the usage stats log entry
-     */
-    abstract protected function checkForeignKeys(object $entry): array;
+    protected function insertTemporaryUsageStatsData(object $entry, int $lineNumber, string $loadId): void
+    {
+        try {
+            if (!$this->temporaryTotalsDao->insert($entry, $lineNumber, $loadId)) {
+                return;
+            }
+            $this->temporaryInstitutionsDao->insert($entry->institutionIds, $lineNumber, $loadId);
+            if (!empty($entry->submissionId)) {
+                $this->temporaryItemInvestigationsDao->insert($entry, $lineNumber, $loadId);
+                if ($entry->assocType == Application::ASSOC_TYPE_SUBMISSION_FILE) {
+                    $this->temporaryItemRequestsDao->insert($entry, $lineNumber, $loadId);
+                }
+            }
+        } catch (\Illuminate\Database\QueryException $e) {
+            $this->addExecutionLogEntry(__('admin.scheduledTask.usageStatsLoader.insertError', ['file' => $loadId, 'lineNumber' => $lineNumber, 'msg' => $e->getMessage()]), ScheduledTaskHelper::SCHEDULED_TASK_MESSAGE_TYPE_ERROR);
+        }
+    }
+
     /**
      * Get valid assoc types that an usage event can contain
      */
     abstract protected function getValidAssocTypes(): array;
+
     /**
      * Validate the usage stats log entry
      *
@@ -258,15 +295,8 @@ abstract class PKPUsageStatsLoader extends FileLoader
                 continue;
             }
 
-            // Check the foreign key constraint violation
-            $foreignKeyErrors = $this->checkForeignKeys($entryData);
-            if (!empty($foreignKeyErrors)) {
-                // Log the message and do not consider this line
-                $missingForeignKeys = implode(', ', $foreignKeyErrors);
-                $this->addExecutionLogEntry(__('admin.scheduledTask.usageStatsLoader.foreignKeyError', ['missingForeignKeys' => $missingForeignKeys, 'file' => $loadId, 'lineNumber' => $lineNumber]), ScheduledTaskHelper::SCHEDULED_TASK_MESSAGE_TYPE_ERROR);
-            } else {
-                $this->insertTemporaryUsageStatsData($entryData, $lineNumber, $loadId);
-            }
+            // Insert into temporary tables
+            $this->insertTemporaryUsageStatsData($entryData, $lineNumber, $loadId);
         }
         fclose($fhandle);
         // Despatch the job that will process the usage stats data and store them
@@ -355,8 +385,4 @@ abstract class PKPUsageStatsLoader extends FileLoader
         $d = \DateTime::createFromFormat($format, $datetime);
         return $d && $d->format($format) === $datetime;
     }
-}
-
-if (!PKP_STRICT_MODE) {
-    class_alias('\PKP\task\PKPUsageStatsLoader', '\PKPUsageStatsLoader');
 }

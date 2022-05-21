@@ -227,8 +227,8 @@ msgstr "Region is not up to three alphanumeric characters long string."
 msgid "admin.scheduledTask.usageStatsLoader.invalidLogEntry.institutionIds"
 msgstr "Institution IDs is not an array."
 
-msgid "admin.scheduledTask.usageStatsLoader.foreignKeyError"
-msgstr "The following foreign keys in the log file {$file} at the line {$lineNumber} are missing: {$missingForeignKeys}."
+msgid "admin.scheduledTask.usageStatsLoader.insertError"
+msgstr "Error occured when processing the log file {$file} at the line {$lineNumber}: {$msg}"
 
 msgid "admin.scheduledTask.usageStatsLoader.jobDispatched"
 msgstr "The background job that will process the log file {$file} and store the statistics data has been dispatched."
