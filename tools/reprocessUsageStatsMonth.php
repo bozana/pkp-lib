@@ -20,7 +20,7 @@ require(dirname(__FILE__, 4) . '/tools/bootstrap.inc.php');
 
 class ReprocessUsageStatsMonth extends \PKP\cliTool\CommandLineTool
 {
-    /** Month that should be reprocssed and stats aggregated by. In the form [YYYYMM] */
+    /** Month that should be reprocessed and stats aggregated by. In the form [YYYYMM] */
     public string $month;
 
     /**
