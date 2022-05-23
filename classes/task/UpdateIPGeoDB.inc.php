@@ -58,18 +58,12 @@ class UpdateIPGeoDB extends ScheduledTask
             return false;
         }
 
-        if (rename($decompressedFile, $finalFileName)) {
-            return $fileMgr->setMode($finalFileName, FileManager::FILE_MODE_MASK);
-        } else {
+        if (!rename($decompressedFile, $finalFileName)) {
             $this->addExecutionLogEntry(__('admin.scheduledTask.updateGeoDB.fileRename.error', ['sourceFilename' => $decompressedFile,
                 'targetFilename' => $finalFileName]), ScheduledTaskHelper::SCHEDULED_TASK_MESSAGE_TYPE_ERROR);
             return false;
         }
 
-        return true;
+        return $fileMgr->setMode($finalFileName, FileManager::FILE_MODE_MASK);
     }
-}
-
-if (!PKP_STRICT_MODE) {
-    class_alias('\PKP\task\UpdateIPGeoDB', '\UpdateIPGeoDB');
 }
