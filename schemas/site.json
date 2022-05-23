@@ -60,16 +60,17 @@
 			"description": "Whether to retain daily usage stats or consolidate monthly stats. Daily stats can quickly result in millions of database rows for large installs with lots of submissions.",
 			"default": false
 		},
-		"siteSushiPlatform": {
+		"isSiteSushiPlatform": {
 			"type": "boolean",
-			"description": "Designate the site as the COUNTER SUSHI platform.",
+			"description": "Whether or not to designate the site as the platform in COUNTER SUSHI statistics. When this is false, the context name is used as the platform name. However, if all of the contexts on this site are published, owned or operated by the same provider, you may wish to designate the site as the platform.",
 			"default": false
 		},
-		"siteSushiPlatformID": {
+		"sushiPlatformID": {
 			"type": "string",
-			"description": "The COUNTER SUSHI platform ID as namespace.",
+			"description": "The platform ID for COUNTER SUSHI statistics. Required when isSiteSushiPlatform is true.",
 			"validation": [
-				"regex:#^[a-zA-Z0-9._/]{1,17}$#"
+				"regex:#^[a-zA-Z0-9._/]{1,17}$#",
+				"nullable"
 			]
 		},
 		"installedLocales": {
