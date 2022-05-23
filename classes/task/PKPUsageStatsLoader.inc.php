@@ -17,15 +17,17 @@ namespace PKP\task;
 
 use APP\core\Application;
 use APP\core\Services;
-use APP\Jobs\Statistics\LoadMetricsDataJob;
-use APP\Jobs\Statistics\LoadMonthlyMetricsDataJob;
+use APP\Jobs\Statistics\CompileMonthlyMetrics;
+use APP\Jobs\Statistics\CompileUsageStatsFromTemporaryRecords;
 use APP\statistics\StatisticsHelper;
 use APP\statistics\TemporaryItemInvestigationsDAO;
 use APP\statistics\TemporaryItemRequestsDAO;
 use APP\statistics\TemporaryTotalsDAO;
+use DateTime;
 use PKP\core\Core;
 use PKP\db\DAORegistry;
 use PKP\file\FileManager;
+use PKP\plugins\HookRegistry;
 use PKP\scheduledTask\ScheduledTaskHelper;
 use PKP\statistics\TemporaryInstitutionsDAO;
 
@@ -63,7 +65,7 @@ abstract class PKPUsageStatsLoader extends FileLoader
             $this->autoStage = false;
         }
 
-        // shall the archived log files be ompressed
+        // shall the archived log files be compressed
         $site = Application::get()->getRequest()->getSite();
         if ($site->getData('compressStatsLogs')) {
             $this->setCompressArchives(true);
@@ -111,7 +113,7 @@ abstract class PKPUsageStatsLoader extends FileLoader
         }
         $processFilesResult = parent::executeActions();
         foreach ($this->months as $month) {
-            dispatch(new LoadMonthlyMetricsDataJob($month));
+            dispatch(new CompileMonthlyMetrics($month, Application::get()->getRequest()->getSite()));
         }
         return ($processFilesResult && !$processingDirError);
     }
@@ -133,9 +135,7 @@ abstract class PKPUsageStatsLoader extends FileLoader
     protected function insertTemporaryUsageStatsData(object $entry, int $lineNumber, string $loadId): void
     {
         try {
-            if (!$this->temporaryTotalsDao->insert($entry, $lineNumber, $loadId)) {
-                return;
-            }
+            $this->temporaryTotalsDao->insert($entry, $lineNumber, $loadId);
             $this->temporaryInstitutionsDao->insert($entry->institutionIds, $lineNumber, $loadId);
             if (!empty($entry->submissionId)) {
                 $this->temporaryItemInvestigationsDao->insert($entry, $lineNumber, $loadId);
@@ -197,29 +197,17 @@ abstract class PKPUsageStatsLoader extends FileLoader
     }
 
     /**
-     * @copydoc FileLoader::processFile()
-     * The file's entries MUST be ordered by date-time to successfully identify double-clicks and unique items.
-     * The file name MUST be of form usage_events_YYYYMMDD.log
+     * Check if the log file's date is later than the first installation of the new log file format,
+     * so that the log file can be processed.
      */
-    protected function processFile(string $filePath): bool|int
+    protected function isDateValid(string $loadId): bool
     {
-        $fhandle = fopen($filePath, 'r');
-        if (!$fhandle) {
-            throw new \Exception(__('admin.scheduledTask.usageStatsLoader.openFileFailed', ['file' => $filePath]));
-        }
-
-        $loadId = basename($filePath);
-        // get the date and month of this log file
-        $logFileDate = substr($loadId, -12, 8);
-        $month = substr($loadId, -12, 6);
-
-        $currentMonth = date('Ym');
-
+        $date = substr($loadId, -12, 8);
         // Get the date when the version that uses the new log file format (and COUNTER R5) is installed.
         // Only the log files later than that day can be (regularly) processed here.
         $statsService = Services::get('sushiStats');
         $dateR5Installed = date('Ymd', strtotime($statsService->getEarliestDate()));
-        if ($logFileDate < $dateR5Installed) {
+        if ($date < $dateR5Installed) {
             // the log file is in old log file format
             // return the file to staging and
             // log the error
@@ -228,9 +216,18 @@ abstract class PKPUsageStatsLoader extends FileLoader
                 'admin.scheduledTask.usageStatsLoader.veryOldLogFile',
                 ['file' => $loadId]
             ), ScheduledTaskHelper::SCHEDULED_TASK_MESSAGE_TYPE_ERROR);
-            return self::FILE_LOADER_RETURN_TO_STAGING;
+            return false;
         }
+        return true;
+    }
 
+    /**
+     * Check if stats for the log file's month do not already exist.
+     * Return true if they do not exist, so that log file can be processed.
+     */
+    protected function isMonthValid(string $loadId, string $month): bool
+    {
+        $currentMonth = date('Ym');
         $site = Application::get()->getRequest()->getSite();
         // If the daily metrics are not kept, and this is not the current month (which is kept in the DB)
         // the CLI script to reprocess the whole month should be called.
@@ -239,26 +236,50 @@ abstract class PKPUsageStatsLoader extends FileLoader
             // currently only the table metrics_counter_submission_monthly will be considered.
             // TO-DO: once we decided how the log files in the old format should be reprocessed
             // this should eventually be adapted, because the metrics_submission_geo_monthly could contain also earlier months
+            $statsService = Services::get('sushiStats');
             $monthExists = $statsService->monthExists($month);
             if ($monthExists) {
                 // The month has already been processed
                 // return the file to staging and
-                // log the error that a script for reprocessing should be called for the whole month
+                // log the error that a script for reprocessing should be called for the whole month.
+                // If the log files of the month are being reprocessed, the CLI reprocessing script will first remove them,
+                // an then call this script, so this condition will not apply.
                 $this->addExecutionLogEntry(__(
                     'admin.scheduledTask.usageStatsLoader.monthExists',
                     ['file' => $loadId]
                 ), ScheduledTaskHelper::SCHEDULED_TASK_MESSAGE_TYPE_ERROR);
-                return self::FILE_LOADER_RETURN_TO_STAGING;
+                return false;
             }
         }
+        return true;
+    }
 
-        // Consider the month for monthly aggregation
+    /**
+     * Add the log file's month to the list of months to be considered for the
+     * stats aggregation after the current log files are processed.
+     */
+    protected function considerMonthForStatsAggregation(string $month): void
+    {
         if (!in_array($month, $this->months)) {
             $this->months[] = $month;
         }
+    }
 
+    /**
+     * Process the log file:
+     * Read the log file line by line, validate, and insert into the temporary stats tables.
+     * The file's entries MUST be ordered by date-time to successfully identify double-clicks and unique items.
+     *
+     * @throws \Exception
+     */
+    protected function process(string $filePath, string $loadId): void
+    {
+        $fhandle = fopen($filePath, 'r');
+        if (!$fhandle) {
+            throw new \Exception(__('admin.scheduledTask.usageStatsLoader.openFileFailed', ['file' => $filePath]));
+        }
         // Make sure we don't have any temporary records associated
-        // with the current load id in database.
+        // with the current load ID in database.
         $this->deleteByLoadId($loadId);
 
         $lineNumber = 0;
@@ -269,25 +290,18 @@ abstract class PKPUsageStatsLoader extends FileLoader
                 continue;
             } // Spacing or comment lines. This actually should not occur in the new format.
 
-            // Regex to parse the usageStats plugin's log access file, i.e. old log file format.
-            // Only the log file of the installation/upgrade day can contain both, old and new log file formats, so maybe there is a better solution for this?
-            $parseRegex = '/^(?P<ip>\S+) \S+ \S+ "(?P<date>.*?)" (?P<url>\S+) (?P<returnCode>\S+) "(?P<userAgent>.*?)"/';
-            if (preg_match($parseRegex, $line, $m)) {
-                // This is a line in the old logfile format. Log the message and skip the line.
-                $this->addExecutionLogEntry(__('admin.scheduledTask.usageStatsLoader.oldLogfileFormat', ['file' => $loadId, 'lineNumber' => $lineNumber]), ScheduledTaskHelper::SCHEDULED_TASK_MESSAGE_TYPE_ERROR);
+            $entryData = json_decode($line);
+            if ($entryData === null) {
+                // This line is not in the right format..
+                $this->addExecutionLogEntry(__('admin.scheduledTask.usageStatsLoader.wrongLoglineFormat', ['file' => $loadId, 'lineNumber' => $lineNumber]), ScheduledTaskHelper::SCHEDULED_TASK_MESSAGE_TYPE_ERROR);
                 continue;
-            } else {
-                $entryData = json_decode($line);
             }
 
             try {
                 $this->isLogEntryValid($entryData);
             } catch (\Exception $e) {
                 // reject the file if the entry in invalid ???
-                throw new \Exception(__(
-                    'admin.scheduledTask.usageStatsLoader.invalidLogEntry',
-                    ['file' => $loadId, 'lineNumber' => $lineNumber, 'error' => $e->getMessage()]
-                ));
+                $this->addExecutionLogEntry(__('admin.scheduledTask.usageStatsLoader.invalidLogEntry', ['file' => $loadId, 'lineNumber' => $lineNumber, 'error' => $e->getMessage()]), ScheduledTaskHelper::SCHEDULED_TASK_MESSAGE_TYPE_ERROR);
             }
 
             // Avoid bots.
@@ -295,18 +309,45 @@ abstract class PKPUsageStatsLoader extends FileLoader
                 continue;
             }
 
-            // Insert into temporary tables
+            HookRegistry::call('Stats::storeUsageEventLogEntry', [$entryData]);
+
             $this->insertTemporaryUsageStatsData($entryData, $lineNumber, $loadId);
         }
         fclose($fhandle);
-        // Despatch the job that will process the usage stats data and store them
-        dispatch(new LoadMetricsDataJob($loadId));
+    }
+
+    /**
+     * @copydoc FileLoader::processFile()
+     * The file name MUST be of form usage_events_YYYYMMDD.log
+     * If the function successfully finishes, the file will be archived.
+     */
+    protected function processFile(string $filePath): bool|int
+    {
+        $loadId = basename($filePath);
+        $month = substr($loadId, -12, 6);
+
+        // Check if the log file is an old log file and if the stats for the month already exist
+        if (!$this->isDateValid($loadId) || !$this->isMonthValid($loadId, $month)) {
+            return self::FILE_LOADER_RETURN_TO_STAGING;
+        }
+
+        // Add this log file's month to the list of months the stats need to be aggregated for.
+        $this->considerMonthForStatsAggregation($month);
+
+        try {
+            $this->process($filePath, $loadId);
+        } catch (\Exception $e) {
+            throw $e;
+        }
+
+        // Despatch the job that will process the usage stats data in
+        // the temporary stats tables and store them in the actual ones
+        dispatch(new CompileUsageStatsFromTemporaryRecords($loadId));
         $this->addExecutionLogEntry(__(
             'admin.scheduledTask.usageStatsLoader.jobDispatched',
             ['file' => $filePath]
         ), ScheduledTaskHelper::SCHEDULED_TASK_MESSAGE_TYPE_NOTICE);
 
-        // The log file will be archived
         return true;
     }
 
@@ -317,7 +358,7 @@ abstract class PKPUsageStatsLoader extends FileLoader
     protected function autoStage(): void
     {
         // Copy all log files to stage directory, except the current day one.
-        $fileMgr = new FileManager();
+        $fileManager = new FileManager();
         $logFiles = [];
         $logsDirFiles = glob($this->getUsageEventLogsPath() . '/*');
         if (is_array($logsDirFiles)) {
@@ -332,9 +373,7 @@ abstract class PKPUsageStatsLoader extends FileLoader
         }
 
         foreach ($logFiles as $filePath) {
-            // Make sure it's a file.
-            if ($fileMgr->fileExists($filePath)) {
-                // Avoid current day file.
+            if ($fileManager->fileExists($filePath)) {
                 $filename = pathinfo($filePath, PATHINFO_BASENAME);
                 $currentDayFilename = $this->getUsageEventCurrentDayLogName();
                 if ($filename == $currentDayFilename) {
@@ -350,15 +389,15 @@ abstract class PKPUsageStatsLoader extends FileLoader
      */
     protected function getStagedFilesByMonth(string $month): array
     {
-        $filesToConsider = [];
+        $files = [];
         $stagePath = StatisticsHelper::getUsageStatsDirPath() . '/' . self::FILE_LOADER_PATH_STAGING;
         $stageDir = opendir($stagePath);
         while ($filename = readdir($stageDir)) {
             if (str_starts_with($filename, 'usage_events_' . $month)) {
-                $filesToConsider[] = $filename;
+                $files[] = $filename;
             }
         }
-        return $filesToConsider;
+        return $files;
     }
 
     /**
@@ -382,7 +421,7 @@ abstract class PKPUsageStatsLoader extends FileLoader
      */
     protected function validateDate(string $datetime, string $format = 'Y-m-d H:i:s'): bool
     {
-        $d = \DateTime::createFromFormat($format, $datetime);
+        $d = DateTime::createFromFormat($format, $datetime);
         return $d && $d->format($format) === $datetime;
     }
 }

@@ -185,8 +185,8 @@ msgstr "The file {$file} is in old log file format that cannot be processed and 
 msgid "admin.scheduledTask.usageStatsLoader.monthExists"
 msgstr "Skipped log file {$file} because statistics from that month have already been calculated. To recalculate statistics for a previous month, you must restore all of that month's log files and use the CLI tool to reprocess statistics."
 
-msgid "admin.scheduledTask.usageStatsLoader.oldLogfileFormat"
-msgstr "The line {$lineNumber} in the log file {$file} is in the old log file format and will thus be skipped."
+msgid "admin.scheduledTask.usageStatsLoader.wrongLoglineFormat"
+msgstr "The line {$lineNumber} in the log file {$file} is in the wrong format and will thus be skipped."
 
 msgid "admin.scheduledTask.usageStatsLoader.invalidLogEntry"
 msgstr "Invalid log entry at line {$lineNumber} in the log file {$file}: {$error}."
@@ -588,8 +588,8 @@ msgstr "Created At"
 msgid "admin.jobs.createdAt"
 msgstr "Created at {$createdAt}"
 
-msgid "admin.job.loadMetricsData.returnToStaging.error"
+msgid "admin.job.compileMetrics.returnToStaging.error"
 msgstr "Job that loads the usage stats data from the file {$file} failed, and the file could not be moved from {$archivedFilePath} to {$stagingPath}."
 
-msgid "admin.job.loadMetricsData.error"
+msgid "admin.job.compileMetrics.error"
 msgstr "Job that loads the usage stats data from the file {$file} failed. The file has been moved to the stage directory."

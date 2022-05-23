@@ -333,7 +333,7 @@ abstract class FileLoader extends ScheduledTask
         while ($filename = readdir($stageDir)) {
             if ($filename == '..' || $filename == '.' ||
                 in_array($filename, $this->_stagedBackFiles) ||
-                (!empty($this->_onlyConsiderFiles) && !in_array($filename, $this->_onlyConsiderFiles))) {
+                (!in_array($filename, $this->_onlyConsiderFiles))) {
                 continue;
             }
 
