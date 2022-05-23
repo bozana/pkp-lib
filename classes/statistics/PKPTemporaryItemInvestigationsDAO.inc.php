@@ -31,9 +31,9 @@ class PKPTemporaryItemInvestigationsDAO
     /**
      * Add the passed usage statistic record.
      */
-    public function insert(object $entryData, int $lineNumber, string $loadId): bool
+    public function insert(object $entryData, int $lineNumber, string $loadId): void
     {
-        return DB::table($this->table)->insert([
+        DB::table($this->table)->insert([
             'date' => $entryData->time,
             'ip' => $entryData->ip,
             'user_agent' => substr($entryData->userAgent, 0, 255),
@@ -81,7 +81,7 @@ class PKPTemporaryItemInvestigationsDAO
     /**
      * Load unique geographical usage on the submission level
      */
-    public function loadMetricsSubmissionGeoDaily(string $loadId): void
+    public function compileSubmissionGeoDailyMetrics(string $loadId): void
     {
         // construct metric_unique upsert
         $metricUniqueUpsertSql = "
@@ -107,7 +107,7 @@ class PKPTemporaryItemInvestigationsDAO
     /**
      * Load unique COUNTER item (submission) investigations
      */
-    public function loadMetricsCounterSubmissionDaily(string $loadId): void
+    public function compileCounterSubmissionDailyMetrics(string $loadId): void
     {
         // construct metric_investigations_unique upsert
         $metricInvestigationsUniqueUpsertSql = "
@@ -133,7 +133,7 @@ class PKPTemporaryItemInvestigationsDAO
     /**
      * Load unique institutional COUNTER item (submission) investigations
      */
-    public function loadMetricsCounterSubmissionInstitutionDaily(string $loadId): void
+    public function compileCounterSubmissionInstitutionDailyMetrics(string $loadId): void
     {
         // construct metric_investigations_unique upsert
         $metricInvestigationsUniqueUpsertSql = "

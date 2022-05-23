@@ -36,13 +36,13 @@ abstract class PKPTemporaryTotalsDAO
     /**
      * Add the passed usage statistic record.
      */
-    public function insert(object $entryData, int $lineNumber, string $loadId): bool
+    public function insert(object $entryData, int $lineNumber, string $loadId): void
     {
         $insertData = $this->getInsertData($entryData);
         $insertData['line_number'] = $lineNumber;
         $insertData['load_id'] = $loadId;
 
-        return DB::table($this->table)->insert($insertData);
+        DB::table($this->table)->insert($insertData);
     }
 
     /**
@@ -97,7 +97,7 @@ abstract class PKPTemporaryTotalsDAO
     /**
      * Load usage for context index pages
      */
-    public function loadMetricsContext(string $loadId): void
+    public function compileContextMetrics(string $loadId): void
     {
         DB::table('metrics_context')->where('load_id', '=', $loadId)->delete();
         $selectContextMetrics = DB::table($this->table)
@@ -111,7 +111,7 @@ abstract class PKPTemporaryTotalsDAO
     /**
      * Load usage for submissions (abstract, primary and supp files)
      */
-    public function loadMetricsSubmission(string $loadId): void
+    public function compileSubmissionMetrics(string $loadId): void
     {
         DB::table('metrics_submission')->where('load_id', '=', $loadId)->delete();
         $selectSubmissionMetrics = DB::table($this->table)
@@ -155,7 +155,7 @@ abstract class PKPTemporaryTotalsDAO
     /**
      * Load total geographical usage on the submission level
      */
-    public function loadMetricsSubmissionGeoDaily(string $loadId): void
+    public function compileSubmissionGeoDailyMetrics(string $loadId): void
     {
         // construct metric upsert
         $metricUpsertSql = "
@@ -181,7 +181,7 @@ abstract class PKPTemporaryTotalsDAO
     /**
      * Load total COUNTER submission usage (investigations and requests)
      */
-    public function loadMetricsCounterSubmissionDaily(string $loadId): void
+    public function compileCounterSubmissionDailyMetrics(string $loadId): void
     {
         // construct metric_investigations upsert
         $metricInvestigationsUpsertSql = "
@@ -227,7 +227,7 @@ abstract class PKPTemporaryTotalsDAO
     /**
      * Load total institutional COUNTER submission usage (investigations and requests)
      */
-    public function loadMetricsCounterSubmissionInstitutionDaily(string $loadId): void
+    public function compileCounterSubmissionInstitutionDailyMetrics(string $loadId): void
     {
         // construct metric_investigations upsert
         $metricInvestigationsUpsertSql = "

@@ -30,28 +30,10 @@ class PKPTemporaryItemRequestsDAO
 
     /**
      * Add the passed usage statistic record.
-     *
-     * @param object $entryData [
-     * 	issue_id
-     *  time
-     *  ip
-     *  canonicalUrl
-     *  contextId
-     *  submissionId
-     *  representationId
-     *  assocType
-     *  assocId
-     *  fileType
-     *  userAgent
-     *  country
-     *  region
-     *  city
-     *  instituionIds
-     * ]
      */
-    public function insert(object $entryData, int $lineNumber, string $loadId): bool
+    public function insert(object $entryData, int $lineNumber, string $loadId): void
     {
-        return DB::table($this->table)->insert([
+        DB::table($this->table)->insert([
             'date' => $entryData->time,
             'ip' => $entryData->ip,
             'user_agent' => substr($entryData->userAgent, 0, 255),
@@ -79,7 +61,7 @@ class PKPTemporaryItemRequestsDAO
     }
 
     /**
-     * Remove Unique Clicks
+     * Remove unique clicks
      * If multiple transactions represent the same item and occur in the same user-sessions, only one unique activity MUST be counted for that item.
      * Unique item is a submission.
      * A user session is defined by the combination of IP address + user agent + transaction date + hour of day.
@@ -99,7 +81,7 @@ class PKPTemporaryItemRequestsDAO
     /**
      * Load unique COUNTER item (submission) requests (primary files downloads)
      */
-    public function loadMetricsCounterSubmissionDaily(string $loadId): void
+    public function compileCounterSubmissionDailyMetrics(string $loadId): void
     {
         // construct metric_requests_unique upsert
         // assoc_type should always be Application::ASSOC_TYPE_SUBMISSION_FILE, but include the condition however
@@ -126,7 +108,7 @@ class PKPTemporaryItemRequestsDAO
     /**
      * Load unique institutional COUNTER item (submisison) requests (primary files downloads)
      */
-    public function loadMetricsCounterSubmissionInstitutionDaily(string $loadId): void
+    public function compileCounterSubmissionInstitutionDailyMetrics(string $loadId): void
     {
         // construct metric_requests_unique upsert
         // assoc_type should always be Application::ASSOC_TYPE_SUBMISSION_FILE, but include the condition however
