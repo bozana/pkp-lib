@@ -62,7 +62,7 @@
 		},
 		"isSiteSushiPlatform": {
 			"type": "boolean",
-			"description": "Whether or not to designate the site as the platform in COUNTER SUSHI statistics. When this is false, the context name is used as the platform name. However, if all of the contexts on this site are published, owned or operated by the same provider, you may wish to designate the site as the platform.",
+			"description": "Whether or not to designate the site as the platform in COUNTER SUSHI statistics. Set this to true when all of the contexts (journals, presses or servers) of this site are published, owned or operated by the same provider.",
 			"default": false
 		},
 		"sushiPlatformID": {
