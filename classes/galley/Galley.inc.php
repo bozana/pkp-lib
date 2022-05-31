@@ -39,24 +39,21 @@ class Galley extends Representation
      */
     public function getViews()
     {
-        $views = 0;
         $fileId = $this->getData('submissionFileId');
-        if ($fileId) {
-            $filters = [
-                'dateStart' => StatisticsHelper::STATISTICS_EARLIEST_DATE,
-                'dateEnd' => date('Y-m-d', strtotime('yesterday')),
-                'contextIds' => [Application::get()->getRequest()->getContext()->getId()],
-                'submissionFileIds' => [$fileId],
-            ];
-            $metrics = Services::get('publicationStats')
-                ->getQueryBuilder($filters)
-                ->getSum([])
-                ->get()->toArray();
-            if (!empty($metrics)) {
-                $views = (int) current($metrics)->metric;
-            }
+        if (!$fileId) {
+            return 0;
         }
-        return $views;
+        $filters = [
+            'dateStart' => StatisticsHelper::STATISTICS_EARLIEST_DATE,
+            'dateEnd' => date('Y-m-d', strtotime('yesterday')),
+            'contextIds' => [Application::get()->getRequest()->getContext()->getId()],
+            'submissionFileIds' => [$fileId],
+        ];
+        $metrics = Services::get('publicationStats')
+            ->getQueryBuilder($filters)
+            ->getSum([])
+            ->value('metric');
+        return $metrics ? $metrics : 0;
     }
 
     /**

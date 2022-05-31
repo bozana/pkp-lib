@@ -15,151 +15,58 @@
 
 namespace PKP\services;
 
-use APP\core\Application;
 use APP\statistics\StatisticsHelper;
-use PKP\core\PKPString;
-use PKP\plugins\HookRegistry;
+use PKP\services\queryBuilders\PKPStatsContextQueryBuilder;
 
 class PKPStatsContextService
 {
+    use PKPStatsServiceTrait;
+
     /**
-     * Get total count of contexts matching the given parameters
+     * Get a count of all contexts with stats that match the request arguments
      */
-    public function getTotalCount(array $args): int
+    public function getCount(array $args): int
+    {
+        $defaultArgs = $this->getDefaultArgs();
+        $args = array_merge($defaultArgs, $args);
+        unset($args['count']);
+        unset($args['offset']);
+        $metricsQB = $this->getQueryBuilder($args);
+        return $metricsQB->getContextIds()->get()->count();
+    }
+
+    /**
+     * Get the contexts with total stats that match the request arguments
+     */
+    public function getTotals(array $args): array
     {
         $defaultArgs = $this->getDefaultArgs();
         $args = array_merge($defaultArgs, $args);
         $metricsQB = $this->getQueryBuilder($args);
-
-        HookRegistry::call('StatsContext::getTotalCount::queryBuilder', [&$metricsQB, $args]);
 
         $groupBy = [StatisticsHelper::STATISTICS_DIMENSION_CONTEXT_ID];
         $metricsQB = $metricsQB->getSum($groupBy);
 
-        return $metricsQB->get()->count();
-    }
-
-    /**
-     * Get total metrics for every context (journal, press, server), ordered by metrics, return just the requested offset
-     */
-    public function getTotalMetrics(array $args): array
-    {
-        $defaultArgs = $this->getDefaultArgs();
-        $args = array_merge($defaultArgs, $args);
-        $metricsQB = $this->getQueryBuilder($args);
-
-        HookRegistry::call('StatsContext::getTotalMetrics::queryBuilder', [&$metricsQB, $args]);
-
-        $groupBy = [StatisticsHelper::STATISTICS_DIMENSION_CONTEXT_ID];
-        $metricsQB = $metricsQB->getSum($groupBy);
-
-        $args['orderDirection'] === StatisticsHelper::STATISTICS_ORDER_ASC ? 'asc' : 'desc';
-        $metricsQB->orderBy(StatisticsHelper::STATISTICS_METRIC, $args['orderDirection']);
-
-        if (isset($args['count'])) {
-            $metricsQB->limit($args['count']);
-            if (isset($args['offset'])) {
-                $metricsQB->offset($args['offset']);
-            }
-        }
-
+        $orderDirection = $args['orderDirection'] === StatisticsHelper::STATISTICS_ORDER_ASC ? 'asc' : 'desc';
+        $metricsQB->orderBy(StatisticsHelper::STATISTICS_METRIC, $orderDirection);
         return $metricsQB->get()->toArray();
     }
 
     /**
-     * Get total metrics (index page views) for a context
-     * Assumes that the context ID is provided in parameters
+     * Get the total views for a context.
      */
-    public function getMetricsForContext(array $args): array
+    public function getTotal(int $contextId, ?string $dateStart, ?string $dateEnd): int
     {
         $defaultArgs = $this->getDefaultArgs();
-        $args = array_merge($defaultArgs, $args);
+        $args = [
+            'contextIds' => [$contextId],
+            'dateStart' => $dateStart ?? $defaultArgs['dateStart'],
+            'dateEnd' => $dateEnd ?? $defaultArgs['dateEnd'],
+        ];
         $metricsQB = $this->getQueryBuilder($args);
-        HookRegistry::call('StatsContext::getMetricsForContext::queryBuilder', [&$metricsQB, $args]);
-        $metricsQB = $metricsQB->getSum([]);
-        return $metricsQB->get()->toArray();
-    }
-
-    /**
-     * Get the sum of a set of metrics broken down by day or month
-     *
-     * @param string $timelineInterval STATISTICS_DIMENSION_MONTH or STATISTICS_DIMENSION_DAY
-     * @param array $args Filter the records to include. See self::getQueryBuilder()
-     *
-     */
-    public function getTimeline(string $timelineInterval, array $args = []): array
-    {
-        $defaultArgs = array_merge($this->getDefaultArgs(), ['orderDirection' => StatisticsHelper::STATISTICS_ORDER_ASC]);
-        $args = array_merge($defaultArgs, $args);
-        $timelineQB = $this->getQueryBuilder($args);
-
-        HookRegistry::call('StatsContext::getTimeline::queryBuilder', [&$timelineQB, $args]);
-
-        $timelineQO = $timelineQB
-            ->getSum([$timelineInterval])
-            ->orderBy($timelineInterval, $args['orderDirection']);
-
-        $result = $timelineQO->get();
-
-        $dateValues = [];
-        foreach ($result as $row) {
-            $row = (array) $row;
-            $date = $row[$timelineInterval];
-            if ($timelineInterval === StatisticsHelper::STATISTICS_DIMENSION_MONTH) {
-                $date = substr($date, 0, 7);
-            }
-            $dateValues[$date] = (int) $row['metric'];
-        }
-
-        $timeline = $this->getEmptyTimelineIntervals($args['dateStart'], $args['dateEnd'], $timelineInterval);
-
-        $timeline = array_map(function ($entry) use ($dateValues) {
-            foreach ($dateValues as $date => $value) {
-                if ($entry['date'] === $date) {
-                    $entry['value'] = $value;
-                    break;
-                }
-            }
-            return $entry;
-        }, $timeline);
-
-        return $timeline;
-    }
-
-    /**
-     * Get all time segments (months or days) between the start and end date
-     * with empty values.
-     *
-     * @param string $timelineInterval STATISTICS_DIMENSION_MONTH or STATISTICS_DIMENSION_DAY
-     *
-     * @return array of time segments in ASC order
-     */
-    public function getEmptyTimelineIntervals(string $startDate, string $endDate, string $timelineInterval): array
-    {
-        if ($timelineInterval === StatisticsHelper::STATISTICS_DIMENSION_MONTH) {
-            $dateFormat = 'Y-m';
-            $labelFormat = 'F Y';
-            $interval = 'P1M';
-        } elseif ($timelineInterval === StatisticsHelper::STATISTICS_DIMENSION_DAY) {
-            $dateFormat = 'Y-m-d';
-            $labelFormat = PKPString::convertStrftimeFormat(Application::get()->getRequest()->getContext()->getLocalizedDateFormatLong());
-            $interval = 'P1D';
-        }
-
-        $startDate = new \DateTime($startDate);
-        $endDate = new \DateTime($endDate);
-
-        $timelineIntervals = [];
-        while ($startDate->format($dateFormat) <= $endDate->format($dateFormat)) {
-            $timelineIntervals[] = [
-                'date' => $startDate->format($dateFormat),
-                'label' => date($labelFormat, $startDate->getTimestamp()),
-                'value' => 0,
-            ];
-            $startDate->add(new \DateInterval($interval));
-        }
-
-        return $timelineIntervals;
+        $metrics = $metricsQB->getSum([])->value('metric');
+        return $metrics ? $metrics : 0;
+        ;
     }
 
     /**
@@ -176,16 +83,24 @@ class PKPStatsContextService
     /**
      * Get a QueryBuilder object with the passed args
      */
-    public function getQueryBuilder(array $args = []): \PKP\services\queryBuilders\PKPStatsContextQueryBuilder
+    public function getQueryBuilder(array $args = []): PKPStatsContextQueryBuilder
     {
-        $statsQB = new \PKP\services\queryBuilders\PKPStatsContextQueryBuilder();
+        $statsQB = new PKPStatsContextQueryBuilder();
         $statsQB
             ->before($args['dateEnd'])
             ->after($args['dateStart']);
+
         if (!empty($args['contextIds'])) {
             $statsQB->filterByContexts($args['contextIds']);
         }
-        HookRegistry::call('StatsContext::queryBuilder', [&$statsQB, $args]);
+
+        if (isset($args['count'])) {
+            $statsQB->limit($args['count']);
+            if (isset($args['offset'])) {
+                $statsQB->offset($args['offset']);
+            }
+        }
+
         return $statsQB;
     }
 }

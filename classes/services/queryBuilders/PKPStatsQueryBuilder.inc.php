@@ -10,11 +10,12 @@
  * @class PKPStatsQueryBuilder
  * @ingroup query_builders
  *
- * @brief Basis class for statistics query builders.
+ * @brief Base class for statistics query builders.
  */
 
 namespace PKP\services\queryBuilders;
 
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use PKP\config\Config;
 use PKP\statistics\PKPStatisticsHelper;
@@ -30,12 +31,19 @@ abstract class PKPStatsQueryBuilder
     /** Include records from this date or after. Default: STATISTICS_EARLIEST_DATE */
     protected string $dateStart;
 
+    /** The count of records to return */
+    protected int $limit = 0;
+
+    /** The offset of records to return */
+    protected int $offset = 0;
+
+
     /**
      * Set the contexts to get records for
      */
-    public function filterByContexts(array|int $contextIds): self
+    public function filterByContexts(array $contextIds): self
     {
-        $this->contextIds = is_array($contextIds) ? $contextIds : [$contextIds];
+        $this->contextIds = $contextIds;
         return $this;
     }
 
@@ -64,6 +72,24 @@ abstract class PKPStatsQueryBuilder
     }
 
     /**
+     * Set the count of records to return
+     */
+    public function limit(int $limit): self
+    {
+        $this->limit = $limit;
+        return $this;
+    }
+
+    /**
+     * Set the offset of records to return
+     */
+    public function offset(int $offset): self
+    {
+        $this->offset = $offset;
+        return $this;
+    }
+
+    /**
      * Get the sum of all matching records
      *
      * Use this method to get the total X views. Pass a
@@ -73,7 +99,7 @@ abstract class PKPStatsQueryBuilder
      * @param array $groupBy One or more columns to group by
      *
      */
-    public function getSum(array $groupBy = []): \Illuminate\Database\Query\Builder
+    public function getSum(array $groupBy = []): Builder
     {
         $selectColumns = $groupBy;
         $selectColumns = $this->getSelectColumns($selectColumns);
@@ -98,35 +124,36 @@ abstract class PKPStatsQueryBuilder
      * object and apply any additional selection, grouping and
      * ordering conditions.
      */
-    abstract protected function _getObject(): \Illuminate\Database\Query\Builder;
+    abstract protected function _getObject(): Builder;
 
     /**
      * Get appropriate SQL code for columns in the select part of the query
      */
     protected function getSelectColumns(array $selectColumns): array
     {
-        if (in_array(PKPStatisticsHelper::STATISTICS_DIMENSION_YEAR, $selectColumns)
-            || in_array(PKPStatisticsHelper::STATISTICS_DIMENSION_MONTH, $selectColumns)
-            || in_array(PKPStatisticsHelper::STATISTICS_DIMENSION_DAY, $selectColumns)) {
-            foreach ($selectColumns as $i => $selectColumn) {
-                if ($selectColumn == PKPStatisticsHelper::STATISTICS_DIMENSION_YEAR) {
-                    if (substr(Config::getVar('database', 'driver'), 0, strlen('postgres')) === 'postgres') {
-                        $selectColumns[$i] = DB::raw("date_trunc('year',date) AS year");
-                    } else {
-                        $selectColumns[$i] = DB::raw("date_format(date, '%Y-01-01') AS year");
-                    }
-                    break;
-                } elseif ($selectColumn == PKPStatisticsHelper::STATISTICS_DIMENSION_MONTH) {
-                    if (substr(Config::getVar('database', 'driver'), 0, strlen('postgres')) === 'postgres') {
-                        $selectColumns[$i] = DB::raw("date_trunc('month',date) AS month");
-                    } else {
-                        $selectColumns[$i] = DB::raw("date_format(date, '%Y-%m-01') AS month");
-                    }
-                    break;
-                } elseif ($selectColumn == PKPStatisticsHelper::STATISTICS_DIMENSION_DAY) {
-                    $selectColumns[$i] = DB::raw('date AS day');
-                    break;
+        if (!in_array(PKPStatisticsHelper::STATISTICS_DIMENSION_YEAR, $selectColumns)
+            && !in_array(PKPStatisticsHelper::STATISTICS_DIMENSION_MONTH, $selectColumns)
+            && !in_array(PKPStatisticsHelper::STATISTICS_DIMENSION_DAY, $selectColumns)) {
+            return $selectColumns;
+        }
+        foreach ($selectColumns as $i => $selectColumn) {
+            if ($selectColumn == PKPStatisticsHelper::STATISTICS_DIMENSION_YEAR) {
+                if (substr(Config::getVar('database', 'driver'), 0, strlen('postgres')) === 'postgres') {
+                    $selectColumns[$i] = DB::raw("date_trunc('year',date) AS year");
+                } else {
+                    $selectColumns[$i] = DB::raw("date_format(date, '%Y-01-01') AS year");
                 }
+                break;
+            } elseif ($selectColumn == PKPStatisticsHelper::STATISTICS_DIMENSION_MONTH) {
+                if (substr(Config::getVar('database', 'driver'), 0, strlen('postgres')) === 'postgres') {
+                    $selectColumns[$i] = DB::raw("date_trunc('month',date) AS month");
+                } else {
+                    $selectColumns[$i] = DB::raw("date_format(date, '%Y-%m-01') AS month");
+                }
+                break;
+            } elseif ($selectColumn == PKPStatisticsHelper::STATISTICS_DIMENSION_DAY) {
+                $selectColumns[$i] = DB::raw('date AS day');
+                break;
             }
         }
         return $selectColumns;

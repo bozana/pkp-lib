@@ -15,19 +15,24 @@
 
 namespace PKP\services;
 
-use APP\core\Application;
 use APP\statistics\StatisticsHelper;
 use Illuminate\Support\Facades\DB;
 use PKP\config\Config;
-use PKP\core\PKPString;
-use PKP\plugins\HookRegistry;
+use PKP\services\queryBuilders\PKPStatsGeoQueryBuilder;
 
 class PKPStatsGeoService
 {
+    use PKPStatsServiceTrait;
+
     /**
-     * Get total count of geo data (countries, regions or cities) matching the given parameters
+     * Get a count of all countries, regions or cities with stats that match the request arguments
+     *
+     * @param string $scale Possible values are:
+     *  StatisticsHelper::STATISTICS_DIMENSION_CITY
+     *  StatisticsHelper::STATISTICS_DIMENSION_REGION
+     *  StatisticsHelper::STATISTICS_DIMENSION_COUNTRY
      */
-    public function getTotalCount(array $args, string $scale): int
+    public function getCount(array $args, string $scale): int
     {
         $defaultArgs = $this->getDefaultArgs();
         $args = array_merge($defaultArgs, $args);
@@ -35,8 +40,6 @@ class PKPStatsGeoService
         unset($args['offset']);
         $metricsQB = $this->getQueryBuilder($args);
 
-        HookRegistry::call('StatsGeo::getTotalCountriesCount::queryBuilder', [&$metricsQB, $args]);
-
         $groupBy = [];
         if ($scale == StatisticsHelper::STATISTICS_DIMENSION_CITY) {
             $groupBy = [StatisticsHelper::STATISTICS_DIMENSION_COUNTRY, StatisticsHelper::STATISTICS_DIMENSION_REGION, StatisticsHelper::STATISTICS_DIMENSION_CITY];
@@ -45,22 +48,19 @@ class PKPStatsGeoService
         } elseif ($scale == StatisticsHelper::STATISTICS_DIMENSION_COUNTRY) {
             $groupBy = [StatisticsHelper::STATISTICS_DIMENSION_COUNTRY];
         }
-        $metricsQB = $metricsQB->getSum($groupBy);
 
-        return $metricsQB->get()->count();
+        return $metricsQB->getGeoData($groupBy)->get()->count();
     }
 
     /**
-     * Get total metrics for every geo data (countrie, region or city), ordered by metrics, return just the requested offset
+     * Get the countries, regions or cities with total stats that match the request arguments
      */
-    public function getTotalMetrics(array $args, string $scale): array
+    public function getTotals(array $args, string $scale): array
     {
         $defaultArgs = $this->getDefaultArgs();
         $args = array_merge($defaultArgs, $args);
         $metricsQB = $this->getQueryBuilder($args);
 
-        HookRegistry::call('StatsGeo::getTotalMetrics::queryBuilder', [&$metricsQB, $args]);
-
         $groupBy = [];
         if ($scale == StatisticsHelper::STATISTICS_DIMENSION_CITY) {
             $groupBy = [StatisticsHelper::STATISTICS_DIMENSION_COUNTRY, StatisticsHelper::STATISTICS_DIMENSION_REGION, StatisticsHelper::STATISTICS_DIMENSION_CITY];
@@ -71,99 +71,9 @@ class PKPStatsGeoService
         }
         $metricsQB = $metricsQB->getSum($groupBy);
 
-        $args['orderDirection'] === StatisticsHelper::STATISTICS_ORDER_ASC ? 'asc' : 'desc';
-        $metricsQB->orderBy(StatisticsHelper::STATISTICS_METRIC, $args['orderDirection']);
-
-        if (isset($args['count'])) {
-            $metricsQB->limit($args['count']);
-            if (isset($args['offset'])) {
-                $metricsQB->offset($args['offset']);
-            }
-        }
-
+        $orderDirection = $args['orderDirection'] === StatisticsHelper::STATISTICS_ORDER_ASC ? 'asc' : 'desc';
+        $metricsQB->orderBy(StatisticsHelper::STATISTICS_METRIC, $orderDirection);
         return $metricsQB->get()->toArray();
-    }
-
-    /**
-     * Get the sum of a set of metrics broken down by day or month
-     *
-     * @param string $timelineInterval STATISTICS_DIMENSION_MONTH or STATISTICS_DIMENSION_DAY
-     * @param array $args Filter the records to include. See self::getQueryBuilder()
-     *
-     */
-    public function getTimeline(string $timelineInterval, array $args = []): array
-    {
-        $defaultArgs = array_merge($this->getDefaultArgs(), ['orderDirection' => StatisticsHelper::STATISTICS_ORDER_ASC]);
-        $args = array_merge($defaultArgs, $args);
-        $timelineQB = $this->getQueryBuilder($args);
-
-        HookRegistry::call('StatsGeo::getTimeline::queryBuilder', [&$timelineQB, $args]);
-
-        $timelineQO = $timelineQB
-            ->getSum([$timelineInterval])
-            ->orderBy($timelineInterval, $args['orderDirection']);
-
-        $result = $timelineQO->get();
-
-        $dateValues = [];
-        foreach ($result as $row) {
-            $row = (array) $row;
-            $date = $row[$timelineInterval];
-            if ($timelineInterval === StatisticsHelper::STATISTICS_DIMENSION_MONTH) {
-                $date = substr($date, 0, 7);
-            }
-            $dateValues[$date] = (int) $row['metric'];
-        }
-
-        $timeline = $this->getEmptyTimelineIntervals($args['dateStart'], $args['dateEnd'], $timelineInterval);
-
-        $timeline = array_map(function ($entry) use ($dateValues) {
-            foreach ($dateValues as $date => $value) {
-                if ($entry['date'] === $date) {
-                    $entry['value'] = $value;
-                    break;
-                }
-            }
-            return $entry;
-        }, $timeline);
-
-        return $timeline;
-    }
-
-    /**
-     * Get all time segments (months or days) between the start and end date
-     * with empty values.
-     *
-     * @param string $timelineInterval STATISTICS_DIMENSION_MONTH or STATISTICS_DIMENSION_DAY
-     *
-     * @return array of time segments in ASC order
-     */
-    public function getEmptyTimelineIntervals(string $startDate, string $endDate, string $timelineInterval): array
-    {
-        if ($timelineInterval === StatisticsHelper::STATISTICS_DIMENSION_MONTH) {
-            $dateFormat = 'Y-m';
-            $labelFormat = 'F Y';
-            $interval = 'P1M';
-        } elseif ($timelineInterval === StatisticsHelper::STATISTICS_DIMENSION_DAY) {
-            $dateFormat = 'Y-m-d';
-            $labelFormat = PKPString::convertStrftimeFormat(Application::get()->getRequest()->getContext()->getLocalizedDateFormatLong());
-            $interval = 'P1D';
-        }
-
-        $startDate = new \DateTime($startDate);
-        $endDate = new \DateTime($endDate);
-
-        $timelineIntervals = [];
-        while ($startDate->format($dateFormat) <= $endDate->format($dateFormat)) {
-            $timelineIntervals[] = [
-                'date' => $startDate->format($dateFormat),
-                'label' => date($labelFormat, $startDate->getTimestamp()),
-                'value' => 0,
-            ];
-            $startDate->add(new \DateInterval($interval));
-        }
-
-        return $timelineIntervals;
     }
 
     /**
@@ -184,9 +94,9 @@ class PKPStatsGeoService
     /**
      * Get a QueryBuilder object with the passed args
      */
-    public function getQueryBuilder($args = []): \PKP\services\queryBuilders\PKPStatsGeoQueryBuilder
+    public function getQueryBuilder($args = []): PKPStatsGeoQueryBuilder
     {
-        $statsQB = new \PKP\services\queryBuilders\PKPStatsGeoQueryBuilder();
+        $statsQB = new PKPStatsGeoQueryBuilder();
         $statsQB
             ->filterByContexts($args['contextIds'])
             ->before($args['dateEnd'])
@@ -204,14 +114,19 @@ class PKPStatsGeoService
         if (!empty($args['cities'])) {
             $statsQB->filterByCities($args['cities']);
         }
-
-        HookRegistry::call('StatsGeo::queryBuilder', [&$statsQB, $args]);
-
+        if (isset($args['count'])) {
+            $statsQB->limit($args['count']);
+            if (isset($args['offset'])) {
+                $statsQB->offset($args['offset']);
+            }
+        }
         return $statsQB;
     }
 
     /**
      * Delete daily usage metrics for a month
+     *
+     * @param string $month Month in the form YYYYMM
      */
     public function deleteDailyMetrics(string $month): void
     {
@@ -225,6 +140,8 @@ class PKPStatsGeoService
 
     /**
      * Delete monthly usage metrics for a month
+     *
+     * @param string $month Month in the form YYYYMM
      */
     public function deleteMonthlyMetrics(string $month): void
     {
@@ -233,8 +150,10 @@ class PKPStatsGeoService
 
     /**
      * Aggregate daily usage metrics by a month
+     *
+     * @param string $month Month in the form YYYYMM
      */
-    public function aggregateMetrics(string $month): void
+    public function addMonthlyMetrics(string $month): void
     {
         // Construct the SQL part depending on the DB
         $monthFormatSql = "DATE_FORMAT(gd.date, '%Y%m')";

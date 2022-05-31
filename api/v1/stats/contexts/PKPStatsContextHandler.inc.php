@@ -41,8 +41,8 @@ class PKPStatsContextHandler extends APIHandler
                     'roles' => [Role::ROLE_ID_SITE_ADMIN]
                 ],
                 [
-                    'pattern' => $this->getEndpointPattern() . '/index',
-                    'handler' => [$this, 'getManyIndex'],
+                    'pattern' => $this->getEndpointPattern() . '/timeline',
+                    'handler' => [$this, 'getManyTimeline'],
                     'roles' => [Role::ROLE_ID_SITE_ADMIN]
                 ],
                 [
@@ -51,8 +51,8 @@ class PKPStatsContextHandler extends APIHandler
                     'roles' => $roles
                 ],
                 [
-                    'pattern' => $this->getEndpointPattern() . '/{contextId:\d+}/index',
-                    'handler' => [$this, 'getIndex'],
+                    'pattern' => $this->getEndpointPattern() . '/{contextId:\d+}/timeline',
+                    'handler' => [$this, 'getTimeline'],
                     'roles' => $roles
                 ],
             ],
@@ -65,22 +65,16 @@ class PKPStatsContextHandler extends APIHandler
      */
     public function authorize($request, &$args, $roleAssignments)
     {
-        $routeName = null;
-        $slimRequest = $this->getSlimRequest();
-
         $rolePolicy = new PolicySet(PolicySet::COMBINING_PERMIT_OVERRIDES);
         foreach ($roleAssignments as $role => $operations) {
             $rolePolicy->addPolicy(new RoleBasedHandlerOperationPolicy($request, $role, $operations));
         }
         $this->addPolicy($rolePolicy);
-
         return parent::authorize($request, $args, $roleAssignments);
     }
 
     /**
-     * Get usage stats for a set of contexts
-     *
-     * Returns total index page views.
+     * Get total views of the homepages for a set of contexts
      */
     public function getMany(SlimHttpRequest $slimRequest, APIResponse $response, array $args): APIResponse
     {
@@ -121,59 +115,49 @@ class PKPStatsContextHandler extends APIHandler
             $allowedParams['contextIds'] = $this->_processSearchPhrase($allowedParams['searchPhrase'], $allowedContextIds);
 
             if (empty($allowedParams['contextIds'])) {
-                $csvColumnNames = $this->_getContextReportColumnNames();
                 if ($responseCSV) {
-                    return $response->withCSV(0, [], $csvColumnNames);
-                } else {
-                    return $response->withJson([
-                        'items' => [],
-                        'itemsMax' => 0,
-                    ], 200);
+                    $csvColumnNames = $this->_getContextReportColumnNames();
+                    return $response->withCSV([], $csvColumnNames, 0);
                 }
+                return $response->withJson([
+                    'items' => [],
+                    'itemsMax' => 0,
+                ], 200);
             }
         }
 
-        // Get a list (count number) of top contexts by their views
+        // Get a list of contexts with their total views matching the params
         $statsService = Services::get('contextStats');
-        $totalMetrics = $statsService->getTotalMetrics($allowedParams);
+        $totalMetrics = $statsService->getTotals($allowedParams);
 
         // Get the stats for each context
         $items = [];
         foreach ($totalMetrics as $totalMetric) {
-            if (empty($totalMetric->context_id)) {
-                continue;
-            }
             $contextId = $totalMetric->context_id;
             $contextViews = $totalMetric->metric;
 
             if ($responseCSV) {
-                $items[] = $this->getCSVItem($contextId, $contextViews);
+                $items[] = $this->getItemForCSV($contextId, $contextViews);
             } else {
-                $items[] = $this->getJSONItem($slimRequest, $contextId, $contextViews);
+                $items[] = $this->getItemForJSON($slimRequest, $contextId, $contextViews);
             }
         }
 
-        $itemsMaxParams = $allowedParams;
-        unset($itemsMaxParams['count']);
-        unset($itemsMaxParams['offset']);
-        $itemsMax = $statsService->getTotalCount($itemsMaxParams);
-
-        $csvColumnNames = $this->_getContextReportColumnNames();
+        $itemsMax = $statsService->getCount($allowedParams);
         if ($responseCSV) {
-            return $response->withCSV($itemsMax, $items, $csvColumnNames);
-        } else {
-            return $response->withJson([
-                'items' => $items,
-                'itemsMax' => $itemsMax,
-            ], 200);
+            $csvColumnNames = $this->_getContextReportColumnNames();
+            return $response->withCSV($items, $csvColumnNames, $itemsMax);
         }
+        return $response->withJson([
+            'items' => $items,
+            'itemsMax' => $itemsMax,
+        ], 200);
     }
 
     /**
-     * Get the total index page views for a set of contexts
-     * in a timeline broken down month or day
+     * Get a monthly or daily timeline of total views for a set of contexts
      */
-    public function getManyIndex(SlimHttpRequest $slimRequest, APIResponse $response, array $args): APIResponse
+    public function getManyTimeline(SlimHttpRequest $slimRequest, APIResponse $response, array $args): APIResponse
     {
         $defaultParams = [
             'timelineInterval' => PKPStatisticsHelper::STATISTICS_DIMENSION_MONTH,
@@ -189,9 +173,9 @@ class PKPStatsContextHandler extends APIHandler
             'contextIds',
         ]);
 
-        HookRegistry::call('API::stats::contexts::index::params', [&$allowedParams, $slimRequest]);
+        HookRegistry::call('API::stats::contexts::timeline::params', [&$allowedParams, $slimRequest]);
 
-        if (!in_array($allowedParams['timelineInterval'], [PKPStatisticsHelper::STATISTICS_DIMENSION_DAY, PKPStatisticsHelper::STATISTICS_DIMENSION_MONTH])) {
+        if (!$this->isValidTimelineInterval($allowedParams['timelineInterval'])) {
             return $response->withStatus(400)->withJsonError('api.stats.400.wrongTimelineInterval');
         }
 
@@ -246,38 +230,28 @@ class PKPStatsContextHandler extends APIHandler
             return $response->withStatus(400)->withJsonError($result);
         }
 
-        $allowedParams['contextIds'] = $context->getId();
+        $dateStart = array_key_exists('dateStart', $allowedParams) ? $allowedParams['dateStart'] : null;
+        $dateEnd = array_key_exists('dateEnd', $allowedParams) ? $allowedParams['dateEnd'] : null;
 
-        $contextViews = 0;
         $statsService = Services::get('contextStats');
-        $contextMetrics = $statsService->getMetricsForContext($allowedParams);
-        if (!empty($contextMetrics)) {
-            $contextViews = (int) current($contextMetrics)->metric;
-        }
+        $contextViews = $statsService->getTotal($context->getId(), $dateStart, $dateEnd);
 
         // Get basic context details for display
-        // Stats may exist for deleted contexts
-        $contextProps = ['id' => $context->getId()];
         $propertyArgs = [
             'request' => $request,
             'slimRequest' => $slimRequest,
         ];
-        $context = Services::get('context')->get($context->getId());
-        if ($context) {
-            $contextProps = Services::get('context')->getSummaryProperties($context, $propertyArgs);
-        }
-
+        $contextProps = Services::get('context')->getSummaryProperties($context, $propertyArgs);
         return $response->withJson([
-            'contextViews' => $contextViews,
-            'contextProps' => $contextProps
+            'total' => $contextViews,
+            'context' => $contextProps
         ], 200);
     }
 
     /**
-     * Get the total index pages views for a context broken down by
-     * month or day
+     * Get a monthly or daily timeline of total views for a context
      */
-    public function getIndex(SlimHttpRequest $slimRequest, APIResponse $response, array $args): APIResponse
+    public function getTimeline(SlimHttpRequest $slimRequest, APIResponse $response, array $args): APIResponse
     {
         $request = $this->getRequest();
 
@@ -302,9 +276,13 @@ class PKPStatsContextHandler extends APIHandler
             'timelineInterval',
         ]);
 
-        $allowedParams['contextIds'] = $context->getId();
+        $allowedParams['contextIds'] = [$context->getId()];
 
-        HookRegistry::call('API::stats::context::index::params', [&$allowedParams, $slimRequest]);
+        HookRegistry::call('API::stats::context::timeline::params', [&$allowedParams, $slimRequest]);
+
+        if (!$this->isValidTimelineInterval($allowedParams['timelineInterval'])) {
+            return $response->withStatus(400)->withJsonError('api.stats.400.wrongTimelineInterval');
+        }
 
         $result = $this->_validateStatDates($allowedParams);
         if ($result !== true) {
@@ -371,19 +349,16 @@ class PKPStatsContextHandler extends APIHandler
     protected function _processSearchPhrase(string $searchPhrase, array $contextIds = []): array
     {
         $searchPhraseContextIds = Services::get('context')->getIds(['searchPhrase' => $searchPhrase]);
-
         if (!empty($contextIds)) {
-            $contextIds = array_intersect($contextIds, $searchPhraseContextIds->toArray());
-        } else {
-            $contextIds = $searchPhraseContextIds->toArray();
+            return array_intersect($contextIds, $searchPhraseContextIds->toArray());
         }
-        return $contextIds;
+        return $searchPhraseContextIds->toArray();
     }
 
     /**
      * Get CSV report columns
      */
-    private function _getContextReportColumnNames(): array
+    protected function _getContextReportColumnNames(): array
     {
         return [
             __('common.id'),
@@ -395,15 +370,14 @@ class PKPStatsContextHandler extends APIHandler
     /**
      * Get CSV row with context index page metrics
      */
-    protected function getCSVItem(int $contextId, int $contextViews): array
+    protected function getItemForCSV(int $contextId, int $contextViews): array
     {
         // Get context title for display
-        // Now that we use foreign keys, the stats should not exist for deleted contexts, but consider it however?
-        $title = '';
-        $context = Services::get('context')->get($contextId);
-        if ($context) {
-            $title = $context->getLocalizedName();
-        }
+        $contexts = Services::get('context')->getManySummary([]);
+        $context = array_filter($contexts, function ($context) use ($contextId) {
+            return $context->id == $contextId;
+        });
+        $title = current($context)->name();
         return [
             $contextId,
             $title,
@@ -414,22 +388,29 @@ class PKPStatsContextHandler extends APIHandler
     /**
      * Get JSON data with context index page metrics
      */
-    protected function getJSONItem(SlimHttpRequest $slimRequest, int $contextId, int $contextViews): array
+    protected function getItemForJSON(SlimHttpRequest $slimRequest, int $contextId, int $contextViews): array
     {
         // Get basic context details for display
-        // Now that we use foreign keys, the stats should not exist for deleted contexts, but consider it however?
-        $contextProps = ['id' => $contextId];
         $propertyArgs = [
             'request' => $this->getRequest(),
             'slimRequest' => $slimRequest,
         ];
         $context = Services::get('context')->get($contextId);
-        if ($context) {
-            $contextProps = Services::get('context')->getSummaryProperties($context, $propertyArgs);
-        }
+        $contextProps = Services::get('context')->getSummaryProperties($context, $propertyArgs);
         return [
-            'contextViews' => $contextViews,
+            'total' => $contextViews,
             'context' => $contextProps,
         ];
+    }
+
+    /**
+     * Check if the timeline interval is valid
+     */
+    protected function isValidTimelineInterval(string $interval): bool
+    {
+        return in_array($interval, [
+            PKPStatisticsHelper::STATISTICS_DIMENSION_DAY,
+            PKPStatisticsHelper::STATISTICS_DIMENSION_MONTH
+        ]);
     }
 }

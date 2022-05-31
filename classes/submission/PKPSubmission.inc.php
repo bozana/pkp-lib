@@ -1503,7 +1503,6 @@ abstract class PKPSubmission extends \PKP\core\DataObject
      */
     public function getViews()
     {
-        $views = 0;
         $filters = [
             'dateStart' => StatisticsHelper::STATISTICS_EARLIEST_DATE,
             'dateEnd' => date('Y-m-d', strtotime('yesterday')),
@@ -1514,11 +1513,8 @@ abstract class PKPSubmission extends \PKP\core\DataObject
         $metrics = Services::get('publicationStats')
             ->getQueryBuilder($filters)
             ->getSum([])
-            ->get()->toArray();
-        if (!empty($metrics)) {
-            $views = (int) current($metrics)->metric;
-        }
-        return $views;
+            ->value('metric');
+        return $metrics ? $metrics : 0;
     }
 
     /**

@@ -17,6 +17,7 @@
 namespace PKP\services\queryBuilders;
 
 use APP\statistics\StatisticsHelper;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use PKP\config\Config;
 use PKP\plugins\HookRegistry;
@@ -44,9 +45,9 @@ class PKPStatsSushiQueryBuilder extends PKPStatsQueryBuilder
     /**
      * Set the submissions to get records for
      */
-    public function filterBySubmissions(array|int $submissionIds): self
+    public function filterBySubmissions(array $submissionIds): self
     {
-        $this->submissionIds = is_array($submissionIds) ? $submissionIds : [$submissionIds];
+        $this->submissionIds = $submissionIds;
         return $this;
     }
 
@@ -62,7 +63,7 @@ class PKPStatsSushiQueryBuilder extends PKPStatsQueryBuilder
     /**
      * @copydoc PKPStatsQueryBuilder::getSum()
      */
-    public function getSum(array $groupBy = []): \Illuminate\Database\Query\Builder
+    public function getSum(array $groupBy = []): Builder
     {
         $selectColumns = $groupBy;
         $q = $this->_getObject();
@@ -104,7 +105,7 @@ class PKPStatsSushiQueryBuilder extends PKPStatsQueryBuilder
     /**
      * @copydoc PKPStatsQueryBuilder::_getObject()
      */
-    protected function _getObject(): \Illuminate\Database\Query\Builder
+    protected function _getObject(): Builder
     {
         if ($this->institutionId === 0) {
             // consider only monthly DB table
@@ -157,6 +158,8 @@ class PKPStatsSushiQueryBuilder extends PKPStatsQueryBuilder
      * Consider only the table metrics_counter_submission_monthly, because
      * it always contains data, while metrics_counter_submission_institution_monthly
      * could not contain data.
+     *
+     * @param string $month Month in the form YYYYMM
      */
     public function monthExists(string $month): bool
     {
@@ -166,6 +169,8 @@ class PKPStatsSushiQueryBuilder extends PKPStatsQueryBuilder
 
     /**
      * Delete daily usage stats for a month
+     *
+     * @param string $month Month in the form YYYYMM
      */
     public function deleteDailyMetrics(string $month): void
     {
@@ -180,6 +185,8 @@ class PKPStatsSushiQueryBuilder extends PKPStatsQueryBuilder
 
     /**
      * Delete monthly usage metrics for a month
+     *
+     * @param string $month Month in the form YYYYMM
      */
     public function deleteMonthlyMetrics(string $month): void
     {
@@ -189,8 +196,10 @@ class PKPStatsSushiQueryBuilder extends PKPStatsQueryBuilder
 
     /**
      * Aggregate daily usage metrics by a month
+     *
+     * @param string $month Month in the form YYYYMM
      */
-    public function aggregateMetrics(string $month): void
+    public function addMonthlyMetrics(string $month): void
     {
         // Construct the SQL part depending on the DB
         $monthFormatSql = "DATE_FORMAT(csd.date, '%Y%m')";

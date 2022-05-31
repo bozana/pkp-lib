@@ -16,6 +16,7 @@
 
 namespace PKP\services\queryBuilders;
 
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use PKP\plugins\HookRegistry;
 use PKP\statistics\PKPStatisticsHelper;
@@ -23,9 +24,19 @@ use PKP\statistics\PKPStatisticsHelper;
 class PKPStatsContextQueryBuilder extends PKPStatsQueryBuilder
 {
     /**
+     * Get contexts IDs
+     */
+    public function getContextIds(): Builder
+    {
+        return $this->_getObject()
+            ->select([PKPStatisticsHelper::STATISTICS_DIMENSION_CONTEXT_ID])
+            ->distinct();
+    }
+
+    /**
      * @copydoc PKPStatsQueryBuilder::_getObject()
      */
-    protected function _getObject(): \Illuminate\Database\Query\Builder
+    protected function _getObject(): Builder
     {
         $q = DB::table('metrics_context');
 
@@ -34,6 +45,13 @@ class PKPStatsContextQueryBuilder extends PKPStatsQueryBuilder
         }
 
         $q->whereBetween(PKPStatisticsHelper::STATISTICS_DIMENSION_DATE, [$this->dateStart, $this->dateEnd]);
+
+        if ($this->limit > 0) {
+            $q->limit($this->limit);
+            if ($this->offset > 0) {
+                $q->offset($this->offset);
+            }
+        }
 
         HookRegistry::call('StatsContext::queryObject', [&$q, $this]);
 

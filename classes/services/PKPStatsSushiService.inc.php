@@ -18,15 +18,16 @@ namespace PKP\services;
 use APP\core\Application;
 use Illuminate\Support\Facades\DB;
 use PKP\plugins\HookRegistry;
+use PKP\services\queryBuilders\PKPStatsSushiQueryBuilder;
 
 class PKPStatsSushiService
 {
     /**
      * Get a QueryBuilder object with the passed args
      */
-    public function getQueryBuilder(array $args = []): \PKP\services\queryBuilders\PKPStatsSushiQueryBuilder
+    public function getQueryBuilder(array $args = []): PKPStatsSushiQueryBuilder
     {
-        $statsQB = new \PKP\services\queryBuilders\PKPStatsSushiQueryBuilder();
+        $statsQB = new PKPStatsSushiQueryBuilder();
         $statsQB
             ->filterByContexts($args['contextIds'])
             ->filterByInstitution((int) $args['institutionId'])
@@ -47,10 +48,12 @@ class PKPStatsSushiService
 
     /**
      * Do usage stats data already exist for the given month
+     *
+     * @param string $month Month in the form YYYYMM
      */
     public function monthExists(string $month): bool
     {
-        $statsQB = new \PKP\services\queryBuilders\PKPStatsSushiQueryBuilder();
+        $statsQB = new PKPStatsSushiQueryBuilder();
         return $statsQB->monthExists($month);
     }
 
@@ -75,28 +78,34 @@ class PKPStatsSushiService
 
     /**
      * Delete daily usage metrics for a month
+     *
+     * @param string $month Month in the form YYYYMM
      */
     public function deleteDailyMetrics(string $month): void
     {
-        $statsQB = new \PKP\services\queryBuilders\PKPStatsSushiQueryBuilder();
+        $statsQB = new PKPStatsSushiQueryBuilder();
         $statsQB->deleteDailyMetrics($month);
     }
 
     /**
      * Delete monthly usage metrics for a month
+     *
+     * @param string $month Month in the form YYYYMM
      */
     public function deleteMonthlyMetrics(string $month): void
     {
-        $statsQB = new \PKP\services\queryBuilders\PKPStatsSushiQueryBuilder();
-        $statsQB->deleteDailyMetrics($month);
+        $statsQB = new PKPStatsSushiQueryBuilder();
+        $statsQB->deleteMonthlyMetrics($month);
     }
 
     /**
      * Aggregate daily usage metrics by a month
+     *
+     * @param string $month Month in the form YYYYMM
      */
-    public function aggregateMetrics(string $month): void
+    public function addMonthlyMetrics(string $month): void
     {
-        $statsQB = new \PKP\services\queryBuilders\PKPStatsSushiQueryBuilder();
-        $statsQB->aggregateMetrics($month);
+        $statsQB = new PKPStatsSushiQueryBuilder();
+        $statsQB->addMonthlyMetrics($month);
     }
 }

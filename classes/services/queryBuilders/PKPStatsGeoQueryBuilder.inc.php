@@ -17,6 +17,7 @@
 namespace PKP\services\queryBuilders;
 
 use APP\statistics\StatisticsHelper;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use PKP\plugins\HookRegistry;
 
@@ -37,52 +38,60 @@ class PKPStatsGeoQueryBuilder extends PKPStatsQueryBuilder
     /**
      * Set the submission to get records for
      */
-    public function filterBySubmissions(array|int $submissionIds): self
+    public function filterBySubmissions(array $submissionIds): self
     {
-        $this->submissionIds = is_array($submissionIds) ? $submissionIds : [$submissionIds];
+        $this->submissionIds = $submissionIds;
         return $this;
     }
 
     /**
      * Set the countries to get records for
      */
-    public function filterByCountries(array|string $countries): self
+    public function filterByCountries(array $countries): self
     {
-        $this->countries = is_array($countries) ? $countries : [$countries];
+        $this->countries = $countries;
         return $this;
     }
 
     /**
      * Set the regions to get records for
      */
-    public function filterByRegions(array|string $regions): self
+    public function filterByRegions(array $regions): self
     {
-        $this->regions = is_array($regions) ? $regions : [$regions];
+        $this->regions = $regions;
         return $this;
     }
 
     /**
      * Set the cities to get records for
      */
-    public function filterByCities(array|string $cities): self
+    public function filterByCities(array $cities): self
     {
-        $this->cities = is_array($cities) ? $cities : [$cities];
+        $this->cities = $cities;
         return $this;
+    }
+
+    /**
+     * Get Geo data
+     */
+    public function getGeoData(array $groupBy): Builder
+    {
+        return $this->_getObject()
+            ->select($groupBy)
+            ->groupBy($groupBy);
     }
 
     /**
      * @copydoc PKPStatsQueryBuilder::getSum()
      */
-    public function getSum(array $groupBy = []): \Illuminate\Database\Query\Builder
+    public function getSum(array $groupBy = []): Builder
     {
         $selectColumns = $groupBy;
         $q = $this->_getObject();
         // Build the select and group by clauses.
         if (!empty($selectColumns)) {
             $q->select($selectColumns);
-            if (!empty($groupBy)) {
-                $q->groupBy($groupBy);
-            }
+            $q->groupBy($groupBy);
         }
         $q->addSelect(DB::raw('SUM(metric) AS metric'));
         $q->addSelect(DB::raw('SUM(metric_unique) AS metric_unique'));
@@ -92,7 +101,7 @@ class PKPStatsGeoQueryBuilder extends PKPStatsQueryBuilder
     /**
      * @copydoc PKPStatsQueryBuilder::_getObject()
      */
-    protected function _getObject(): \Illuminate\Database\Query\Builder
+    protected function _getObject(): Builder
     {
         // consider only monthly DB table
         $q = DB::table('metrics_submission_geo_monthly');
@@ -150,6 +159,13 @@ class PKPStatsGeoQueryBuilder extends PKPStatsQueryBuilder
         }
 
         $q->whereBetween(StatisticsHelper::STATISTICS_DIMENSION_MONTH, [date_format(date_create($this->dateStart), 'Ym'), date_format(date_create($this->dateEnd), 'Ym')]);
+
+        if ($this->limit > 0) {
+            $q->limit($this->limit);
+            if ($this->offset > 0) {
+                $q->offset($this->offset);
+            }
+        }
 
         HookRegistry::call('StatsGeo::queryObject', [&$q, $this]);
 

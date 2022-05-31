@@ -16,20 +16,13 @@
 namespace PKP\services;
 
 use APP\core\Application;
-use PKP\core\PKPString;
 use PKP\plugins\HookRegistry;
+use PKP\services\queryBuilders\PKPStatsPublicationQueryBuilder;
 use PKP\statistics\PKPStatisticsHelper;
 
 class PKPStatsPublicationService
 {
-    /**
-     * A callback to be used with array_map() to return all
-     * submission IDs from the records.
-     */
-    public function filterSubmissionIds(object $record): int
-    {
-        return $record->submission_id;
-    }
+    use PKPStatsServiceTrait;
 
     /**
      * A callback to be used with array_filter() to return
@@ -68,9 +61,9 @@ class PKPStatsPublicationService
     }
 
     /**
-     * Get total count of submissions matching the given parameters
+     * Get a count of all submissions with stats that match the request arguments
      */
-    public function getTotalCount(array $args): int
+    public function getCount(array $args): int
     {
         $defaultArgs = $this->getDefaultArgs();
         $args = array_merge($defaultArgs, $args, ['assocTypes' => [Application::ASSOC_TYPE_SUBMISSION, Application::ASSOC_TYPE_SUBMISSION_FILE]]);
@@ -78,38 +71,27 @@ class PKPStatsPublicationService
         unset($args['offset']);
         $metricsQB = $this->getQueryBuilder($args);
 
-        HookRegistry::call('StatsPublication::getTotalCount::queryBuilder', [&$metricsQB, $args]);
+        HookRegistry::call('StatsPublication::getCount::queryBuilder', [&$metricsQB, $args]);
 
-        $groupBy = [PKPStatisticsHelper::STATISTICS_DIMENSION_SUBMISSION_ID];
-        $metricsQB = $metricsQB->getSum($groupBy);
-
-        return $metricsQB->get()->count();
+        return $metricsQB->getSubmissionIds()->get()->count();
     }
 
     /**
-     * Get total metrics for every submission, ordered by metrics, return just the requested offset
+     * Get the submissions with total stats that match the request arguments
      */
-    public function getTotalMetrics(array $args): array
+    public function getTotals(array $args): array
     {
         $defaultArgs = $this->getDefaultArgs();
         $args = array_merge($defaultArgs, $args, ['assocTypes' => [Application::ASSOC_TYPE_SUBMISSION, Application::ASSOC_TYPE_SUBMISSION_FILE], 'orderDirection' => PKPStatisticsHelper::STATISTICS_ORDER_DESC]);
         $metricsQB = $this->getQueryBuilder($args);
 
-        HookRegistry::call('StatsPublication::getTotalMetrics::queryBuilder', [&$metricsQB, $args]);
+        HookRegistry::call('StatsPublication::getTotals::queryBuilder', [&$metricsQB, $args]);
 
         $groupBy = [PKPStatisticsHelper::STATISTICS_DIMENSION_SUBMISSION_ID];
         $metricsQB = $metricsQB->getSum($groupBy);
 
-        $args['orderDirection'] === PKPStatisticsHelper::STATISTICS_ORDER_ASC ? 'asc' : 'desc';
-        $metricsQB->orderBy(PKPStatisticsHelper::STATISTICS_METRIC, $args['orderDirection']);
-
-        if (isset($args['count'])) {
-            $metricsQB->limit($args['count']);
-            if (isset($args['offset'])) {
-                $metricsQB->offset($args['offset']);
-            }
-        }
-
+        $orderDirection = $args['orderDirection'] === PKPStatisticsHelper::STATISTICS_ORDER_ASC ? 'asc' : 'desc';
+        $metricsQB->orderBy(PKPStatisticsHelper::STATISTICS_METRIC, $orderDirection);
         return $metricsQB->get()->toArray();
     }
 
@@ -117,25 +99,56 @@ class PKPStatsPublicationService
      * Get metrics by type (abstract, pdf, html, other) for a submission
      * Assumes that the submission ID is provided in parameters
      */
-    public function getMetricsByType(array $args): array
+    public function getTotalsByType(int $submissionId, int $contextId, ?string $dateStart, ?string $dateEnd): array
     {
         $defaultArgs = $this->getDefaultArgs();
-        $args = array_merge($defaultArgs, $args, ['assocTypes' => [Application::ASSOC_TYPE_SUBMISSION, Application::ASSOC_TYPE_SUBMISSION_FILE]]);
+        $args = [
+            'submissionIds' => [$submissionId],
+            'contextIds' => [$contextId],
+            'dateStart' => $dateStart ?? $defaultArgs['dateStart'],
+            'dateEnd' => $dateEnd ?? $defaultArgs['dateEnd'],
+            'assocTypes' => [Application::ASSOC_TYPE_SUBMISSION, Application::ASSOC_TYPE_SUBMISSION_FILE]
+        ];
         $metricsQB = $this->getQueryBuilder($args);
 
-        HookRegistry::call('StatsPublication::getMetricsByType::queryBuilder', [&$metricsQB, $args]);
+        HookRegistry::call('StatsPublication::getTotalsByType::queryBuilder', [&$metricsQB, $args]);
 
         // get abstract, pdf, html and other views for the submission
         $groupBy = [PKPStatisticsHelper::STATISTICS_DIMENSION_ASSOC_TYPE, PKPStatisticsHelper::STATISTICS_DIMENSION_FILE_TYPE];
 
         $metricsQB = $metricsQB->getSum($groupBy);
-        return $metricsQB->get()->toArray();
+        $metricsByType = $metricsQB->get()->toArray();
+
+        $abstractViews = $pdfViews = $htmlViews = $otherViews = 0;
+        $abstractRecord = array_filter($metricsByType, [$this, 'filterRecordAbstract']);
+        if (!empty($abstractRecord)) {
+            $abstractViews = (int) current($abstractRecord)->metric;
+        }
+        $pdfRecord = array_filter($metricsByType, [$this, 'filterRecordPdf']);
+        if (!empty($pdfRecord)) {
+            $pdfViews = (int) current($pdfRecord)->metric;
+        }
+        $htmlRecord = array_filter($metricsByType, [$this, 'filterRecordHtml']);
+        if (!empty($htmlRecord)) {
+            $htmlViews = (int) current($htmlRecord)->metric;
+        }
+        $otherRecord = array_filter($metricsByType, [$this, 'filterRecordOther']);
+        if (!empty($otherRecord)) {
+            $otherViews = (int) current($otherRecord)->metric;
+        }
+
+        return [
+            'abstract' => $abstractViews,
+            'pdf' => $pdfViews,
+            'html' => $htmlViews,
+            'other' => $otherViews,
+        ];
     }
 
     /**
-     * Get total count of submisison files matching the given parameters
+     * Get a count of all submisison files with stats that match the request arguments
      */
-    public function getTotalFilesCount(array $args): int
+    public function getFilesCount(array $args): int
     {
         $defaultArgs = $this->getDefaultArgs();
         $args = array_merge($defaultArgs, $args, ['assocTypes' => [Application::ASSOC_TYPE_SUBMISSION_FILE, Application::ASSOC_TYPE_SUBMISSION_FILE_COUNTER_OTHER]]);
@@ -143,7 +156,7 @@ class PKPStatsPublicationService
         unset($args['offset']);
         $metricsQB = $this->getQueryBuilder($args);
 
-        HookRegistry::call('StatsPublication::getTotalFilesCount::queryBuilder', [&$metricsQB, $args]);
+        HookRegistry::call('StatsPublication::getFilesCount::queryBuilder', [&$metricsQB, $args]);
 
         $groupBy = [PKPStatisticsHelper::STATISTICS_DIMENSION_SUBMISSION_ID, PKPStatisticsHelper::STATISTICS_DIMENSION_SUBMISSION_FILE_ID];
         $metricsQB = $metricsQB->getSum($groupBy);
@@ -152,112 +165,23 @@ class PKPStatsPublicationService
     }
 
     /**
-     * Get total metrics for every submission file, ordered by metrics, return just the requested offset
+     * Get the submission files with total stats that match the request arguments
      */
-    public function getTotalFilesMetrics(array $args): array
+    public function getFilesTotals(array $args): array
     {
         $defaultArgs = $this->getDefaultArgs();
         $args = array_merge($defaultArgs, $args, ['assocTypes' => [Application::ASSOC_TYPE_SUBMISSION_FILE, Application::ASSOC_TYPE_SUBMISSION_FILE_COUNTER_OTHER]]);
         $metricsQB = $this->getQueryBuilder($args);
 
-        HookRegistry::call('StatsPublication::getFilesMetrics::queryBuilder', [&$metricsQB, $args]);
+        HookRegistry::call('StatsPublication::getFilesTotals::queryBuilder', [&$metricsQB, $args]);
 
         $groupBy = [PKPStatisticsHelper::STATISTICS_DIMENSION_SUBMISSION_ID, PKPStatisticsHelper::STATISTICS_DIMENSION_SUBMISSION_FILE_ID];
         $metricsQB = $metricsQB->getSum($groupBy);
 
-        $args['orderDirection'] === PKPStatisticsHelper::STATISTICS_ORDER_ASC ? 'asc' : 'desc';
-        $metricsQB->orderBy(PKPStatisticsHelper::STATISTICS_METRIC, $args['orderDirection']);
-
-        if (isset($args['count'])) {
-            $metricsQB->limit($args['count']);
-            if (isset($args['offset'])) {
-                $metricsQB->offset($args['offset']);
-            }
-        }
+        $orderDirection = $args['orderDirection'] === PKPStatisticsHelper::STATISTICS_ORDER_ASC ? 'asc' : 'desc';
+        $metricsQB->orderBy(PKPStatisticsHelper::STATISTICS_METRIC, $orderDirection);
 
         return $metricsQB->get()->toArray();
-    }
-
-    /**
-     * Get the sum of a set of metrics broken down by day or month
-     *
-     * @param string $timelineInterval STATISTICS_DIMENSION_MONTH or STATISTICS_DIMENSION_DAY
-     * @param array $args Filter the records to include. See self::getQueryBuilder()
-     *
-     */
-    public function getTimeline(string $timelineInterval, array $args = []): array
-    {
-        $defaultArgs = array_merge($this->getDefaultArgs(), ['orderDirection' => PKPStatisticsHelper::STATISTICS_ORDER_ASC]);
-        $args = array_merge($defaultArgs, $args);
-        $timelineQB = $this->getQueryBuilder($args);
-
-        HookRegistry::call('StatsPublication::getTimeline::queryBuilder', [&$timelineQB, $args]);
-
-        $timelineQO = $timelineQB
-            ->getSum([$timelineInterval])
-            ->orderBy($timelineInterval, $args['orderDirection']);
-
-        $result = $timelineQO->get();
-
-        $dateValues = [];
-        foreach ($result as $row) {
-            $row = (array) $row;
-            $date = $row[$timelineInterval];
-            if ($timelineInterval === PKPStatisticsHelper::STATISTICS_DIMENSION_MONTH) {
-                $date = substr($date, 0, 7);
-            }
-            $dateValues[$date] = (int) $row['metric'];
-        }
-
-        $timeline = $this->getEmptyTimelineIntervals($args['dateStart'], $args['dateEnd'], $timelineInterval);
-
-        $timeline = array_map(function ($entry) use ($dateValues) {
-            foreach ($dateValues as $date => $value) {
-                if ($entry['date'] === $date) {
-                    $entry['value'] = $value;
-                    break;
-                }
-            }
-            return $entry;
-        }, $timeline);
-
-        return $timeline;
-    }
-
-    /**
-     * Get all time segments (months or days) between the start and end date
-     * with empty values.
-     *
-     * @param string $timelineInterval STATISTICS_DIMENSION_MONTH or STATISTICS_DIMENSION_DAY
-     *
-     * @return array of time segments in ASC order
-     */
-    public function getEmptyTimelineIntervals(string $startDate, string $endDate, string $timelineInterval): array
-    {
-        if ($timelineInterval === PKPStatisticsHelper::STATISTICS_DIMENSION_MONTH) {
-            $dateFormat = 'Y-m';
-            $labelFormat = 'F Y';
-            $interval = 'P1M';
-        } elseif ($timelineInterval === PKPStatisticsHelper::STATISTICS_DIMENSION_DAY) {
-            $dateFormat = 'Y-m-d';
-            $labelFormat = PKPString::convertStrftimeFormat(Application::get()->getRequest()->getContext()->getLocalizedDateFormatLong());
-            $interval = 'P1D';
-        }
-
-        $startDate = new \DateTime($startDate);
-        $endDate = new \DateTime($endDate);
-
-        $timelineIntervals = [];
-        while ($startDate->format($dateFormat) <= $endDate->format($dateFormat)) {
-            $timelineIntervals[] = [
-                'date' => $startDate->format($dateFormat),
-                'label' => date($labelFormat, $startDate->getTimestamp()),
-                'value' => 0,
-            ];
-            $startDate->add(new \DateInterval($interval));
-        }
-
-        return $timelineIntervals;
     }
 
     /**
@@ -278,9 +202,9 @@ class PKPStatsPublicationService
     /**
      * Get a QueryBuilder object with the passed args
      */
-    public function getQueryBuilder(array $args = []): \PKP\services\queryBuilders\PKPStatsPublicationQueryBuilder
+    public function getQueryBuilder(array $args = []): PKPStatsPublicationQueryBuilder
     {
-        $statsQB = new \PKP\services\queryBuilders\PKPStatsPublicationQueryBuilder();
+        $statsQB = new PKPStatsPublicationQueryBuilder();
         $statsQB
             ->filterByContexts($args['contextIds'])
             ->before($args['dateEnd'])
@@ -304,6 +228,13 @@ class PKPStatsPublicationService
 
         if (!empty(($args['submissionFileIds']))) {
             $statsQB->filterBySubmissionFiles($args['submissionFileIds']);
+        }
+
+        if (isset($args['count'])) {
+            $statsQB->limit($args['count']);
+            if (isset($args['offset'])) {
+                $statsQB->offset($args['offset']);
+            }
         }
 
         HookRegistry::call('StatsPublication::queryBuilder', [&$statsQB, $args]);

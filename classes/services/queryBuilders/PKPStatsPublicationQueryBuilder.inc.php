@@ -16,8 +16,8 @@
 
 namespace PKP\services\queryBuilders;
 
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
-
 use PKP\plugins\HookRegistry;
 use PKP\statistics\PKPStatisticsHelper;
 
@@ -48,52 +48,62 @@ class PKPStatsPublicationQueryBuilder extends PKPStatsQueryBuilder
     /**
      * Set the submissions to get records for
      */
-    public function filterBySubmissions(array|int $submissionIds): self
+    public function filterBySubmissions(array $submissionIds): self
     {
-        $this->submissionIds = is_array($submissionIds) ? $submissionIds : [$submissionIds];
+        $this->submissionIds = $submissionIds;
         return $this;
     }
 
     /**
      * Set the representations to get records for
      */
-    public function filterByRepresentations(array|int $representationIds): self
+    public function filterByRepresentations(array $representationIds): self
     {
-        $this->representationIds = is_array($representationIds) ? $representationIds : [$representationIds];
+        $this->representationIds = $representationIds;
         return $this;
     }
 
     /**
      * Set the files to get records for
      */
-    public function filterBySubmissionFiles(array|int $submissionFileIds): self
+    public function filterBySubmissionFiles(array $submissionFileIds): self
     {
-        $this->submissionFileIds = is_array($submissionFileIds) ? $submissionFileIds : [$submissionFileIds];
+        $this->submissionFileIds = $submissionFileIds;
         return $this;
     }
 
     /**
      * Set the assocTypes to get records for
      */
-    public function filterByAssocTypes(array|int $assocTypes): self
+    public function filterByAssocTypes(array $assocTypes): self
     {
-        $this->assocTypes = is_array($assocTypes) ? $assocTypes : [$assocTypes];
+        $this->assocTypes = $assocTypes;
         return $this;
     }
 
     /**
      * Set the galley file type to get records for
      */
-    public function filterByFileTypes(array|int $fileTypes): self
+    public function filterByFileTypes(array $fileTypes): self
     {
-        $this->fileTypes = is_array($fileTypes) ? $fileTypes : [$fileTypes];
+        $this->fileTypes = $fileTypes;
         return $this;
+    }
+
+    /**
+     * Get submission IDs
+     */
+    public function getSubmissionIds(): Builder
+    {
+        return $this->_getObject()
+            ->select([PKPStatisticsHelper::STATISTICS_DIMENSION_SUBMISSION_ID])
+            ->distinct();
     }
 
     /**
      * @copydoc PKPStatsQueryBuilder::_getObject()
      */
-    protected function _getObject(): \Illuminate\Database\Query\Builder
+    protected function _getObject(): Builder
     {
         $q = DB::table('metrics_submission');
 
@@ -122,6 +132,13 @@ class PKPStatsPublicationQueryBuilder extends PKPStatsQueryBuilder
         }
 
         $q->whereBetween(PKPStatisticsHelper::STATISTICS_DIMENSION_DATE, [$this->dateStart, $this->dateEnd]);
+
+        if ($this->limit > 0) {
+            $q->limit($this->limit);
+            if ($this->offset > 0) {
+                $q->offset($this->offset);
+            }
+        }
 
         HookRegistry::call('StatsPublication::queryObject', [&$q, $this]);
 
