@@ -185,9 +185,9 @@ abstract class PKPStatsPublicationHandler extends APIHandler
             $metricsByType = $statsService->getTotalsByType($submissionId, $this->getRequest()->getContext()->getId(), $dateStart, $dateEnd);
 
             if ($responseCSV) {
-                $items[] = $this->getItemForCSV($submissionId, $metricsByType['abstract'], $metricsByType['pdf'], $metricsByType['html'], $metricsByType['other']);
+                $items[] = $this->getItemForCSV($submissionId, $metricsByType['abstract'], $metricsByType['pdf'], $metricsByType['html'], $metricsByType['other'], $metricsByType['suppFileViews']);
             } else {
-                $items[] = $this->getItemForJSON($submissionId, $metricsByType['abstract'], $metricsByType['pdf'], $metricsByType['html'], $metricsByType['other']);
+                $items[] = $this->getItemForJSON($submissionId, $metricsByType['abstract'], $metricsByType['pdf'], $metricsByType['html'], $metricsByType['other'], $metricsByType['suppFileViews']);
             }
         }
 
@@ -319,6 +319,7 @@ abstract class PKPStatsPublicationHandler extends APIHandler
             'pdfViews' => $metricsByType['pdf'],
             'htmlViews' => $metricsByType['html'],
             'otherViews' => $metricsByType['other'],
+            'suppFileViews' => $metricsByType['suppFileViews'],
             'publication' => Repo::submission()->getSchemaMap()->mapToStats($submission),
         ], 200);
     }
@@ -877,6 +878,7 @@ abstract class PKPStatsPublicationHandler extends APIHandler
             __('stats.pdf'),
             __('stats.html'),
             __('common.other'),
+            __('stats.suppFileViews')
         ];
     }
 
@@ -926,7 +928,7 @@ abstract class PKPStatsPublicationHandler extends APIHandler
     /**
      * Get the CSV row with submission metrics
      */
-    protected function getItemForCSV(int $submissionId, int $abstractViews, int $pdfViews, int $htmlViews, int $otherViews): array
+    protected function getItemForCSV(int $submissionId, int $abstractViews, int $pdfViews, int $htmlViews, int $otherViews, int $suppFileViews): array
     {
         $galleyViews = $pdfViews + $htmlViews + $otherViews;
         $totalViews = $abstractViews + $galleyViews;
@@ -943,14 +945,15 @@ abstract class PKPStatsPublicationHandler extends APIHandler
             $galleyViews,
             $pdfViews,
             $htmlViews,
-            $otherViews
+            $otherViews,
+            $suppFileViews
         ];
     }
 
     /**
      * Get the JSON data with submission metrics
      */
-    protected function getItemForJSON(int $submissionId, int $abstractViews, int $pdfViews, int $htmlViews, int $otherViews): array
+    protected function getItemForJSON(int $submissionId, int $abstractViews, int $pdfViews, int $htmlViews, int $otherViews, int $suppFileViews): array
     {
         $galleyViews = $pdfViews + $htmlViews + $otherViews;
 
@@ -964,6 +967,7 @@ abstract class PKPStatsPublicationHandler extends APIHandler
             'pdfViews' => $pdfViews,
             'htmlViews' => $htmlViews,
             'otherViews' => $otherViews,
+            'suppFileViews' => $suppFileViews,
             'publication' => $submissionProps,
         ];
     }

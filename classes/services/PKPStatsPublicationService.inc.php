@@ -61,12 +61,21 @@ class PKPStatsPublicationService
     }
 
     /**
+     * A callback to be used with array_filter() to return
+     * records for supplementary file.
+     */
+    public function filterRecordSuppFile(object $record): bool
+    {
+        return $record->assoc_type == Application::ASSOC_TYPE_SUBMISSION_FILE_COUNTER_OTHER;
+    }
+
+    /**
      * Get a count of all submissions with stats that match the request arguments
      */
     public function getCount(array $args): int
     {
         $defaultArgs = $this->getDefaultArgs();
-        $args = array_merge($defaultArgs, $args, ['assocTypes' => [Application::ASSOC_TYPE_SUBMISSION, Application::ASSOC_TYPE_SUBMISSION_FILE]]);
+        $args = array_merge($defaultArgs, $args, ['assocTypes' => [Application::ASSOC_TYPE_SUBMISSION, Application::ASSOC_TYPE_SUBMISSION_FILE, Application::ASSOC_TYPE_SUBMISSION_FILE_COUNTER_OTHER]]);
         unset($args['count']);
         unset($args['offset']);
         $metricsQB = $this->getQueryBuilder($args);
@@ -82,7 +91,7 @@ class PKPStatsPublicationService
     public function getTotals(array $args): array
     {
         $defaultArgs = $this->getDefaultArgs();
-        $args = array_merge($defaultArgs, $args, ['assocTypes' => [Application::ASSOC_TYPE_SUBMISSION, Application::ASSOC_TYPE_SUBMISSION_FILE], 'orderDirection' => PKPStatisticsHelper::STATISTICS_ORDER_DESC]);
+        $args = array_merge($defaultArgs, $args, ['assocTypes' => [Application::ASSOC_TYPE_SUBMISSION, Application::ASSOC_TYPE_SUBMISSION_FILE, Application::ASSOC_TYPE_SUBMISSION_FILE_COUNTER_OTHER], 'orderDirection' => PKPStatisticsHelper::STATISTICS_ORDER_DESC]);
         $metricsQB = $this->getQueryBuilder($args);
 
         HookRegistry::call('StatsPublication::getTotals::queryBuilder', [&$metricsQB, $args]);
@@ -107,7 +116,7 @@ class PKPStatsPublicationService
             'contextIds' => [$contextId],
             'dateStart' => $dateStart ?? $defaultArgs['dateStart'],
             'dateEnd' => $dateEnd ?? $defaultArgs['dateEnd'],
-            'assocTypes' => [Application::ASSOC_TYPE_SUBMISSION, Application::ASSOC_TYPE_SUBMISSION_FILE]
+            'assocTypes' => [Application::ASSOC_TYPE_SUBMISSION, Application::ASSOC_TYPE_SUBMISSION_FILE, Application::ASSOC_TYPE_SUBMISSION_FILE_COUNTER_OTHER]
         ];
         $metricsQB = $this->getQueryBuilder($args);
 
@@ -119,7 +128,7 @@ class PKPStatsPublicationService
         $metricsQB = $metricsQB->getSum($groupBy);
         $metricsByType = $metricsQB->get()->toArray();
 
-        $abstractViews = $pdfViews = $htmlViews = $otherViews = 0;
+        $abstractViews = $pdfViews = $htmlViews = $otherViews = $suppFileViews = 0;
         $abstractRecord = array_filter($metricsByType, [$this, 'filterRecordAbstract']);
         if (!empty($abstractRecord)) {
             $abstractViews = (int) current($abstractRecord)->metric;
@@ -136,12 +145,17 @@ class PKPStatsPublicationService
         if (!empty($otherRecord)) {
             $otherViews = (int) current($otherRecord)->metric;
         }
+        $suppFileRecord = array_filter($metricsByType, [$this, 'filterRecordSuppFile']);
+        if (!empty($suppFileRecord)) {
+            $suppFileViews = (int) current($suppFileRecord)->metric;
+        }
 
         return [
             'abstract' => $abstractViews,
             'pdf' => $pdfViews,
             'html' => $htmlViews,
             'other' => $otherViews,
+            'suppFileViews' => $suppFileViews
         ];
     }
 
