@@ -243,8 +243,8 @@ class PKPStatsHandler extends Handler
         $count = 30;
 
         $timeline = Services::get('publicationStats')->getTimeline(PKPStatisticsHelper::STATISTICS_DIMENSION_DAY, [
-            'assocTypes' => Application::ASSOC_TYPE_SUBMISSION,
-            'contextIds' => $context->getId(),
+            'assocTypes' => [Application::ASSOC_TYPE_SUBMISSION],
+            'contextIds' => [$context->getId()],
             'count' => $count,
             'dateStart' => $dateStart,
             'dateEnd' => $dateEnd,

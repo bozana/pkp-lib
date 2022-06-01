@@ -139,14 +139,16 @@ abstract class PKPStatsQueryBuilder
         foreach ($selectColumns as $i => $selectColumn) {
             if ($selectColumn == PKPStatisticsHelper::STATISTICS_DIMENSION_YEAR) {
                 if (substr(Config::getVar('database', 'driver'), 0, strlen('postgres')) === 'postgres') {
-                    $selectColumns[$i] = DB::raw("date_trunc('year',date) AS year");
+                    // date_trunc: Values of type date are cast automatically to timestamp. So cast them back to date.
+                    $selectColumns[$i] = DB::raw("date_trunc('year', date)::timestamp::date AS year");
                 } else {
                     $selectColumns[$i] = DB::raw("date_format(date, '%Y-01-01') AS year");
                 }
                 break;
             } elseif ($selectColumn == PKPStatisticsHelper::STATISTICS_DIMENSION_MONTH) {
                 if (substr(Config::getVar('database', 'driver'), 0, strlen('postgres')) === 'postgres') {
-                    $selectColumns[$i] = DB::raw("date_trunc('month',date) AS month");
+                    // date_trunc: Values of type date are cast automatically to timestamp. So cast them back to date.
+                    $selectColumns[$i] = DB::raw("date_trunc('month', date)::timestamp::date AS month");
                 } else {
                     $selectColumns[$i] = DB::raw("date_format(date, '%Y-%m-01') AS month");
                 }
