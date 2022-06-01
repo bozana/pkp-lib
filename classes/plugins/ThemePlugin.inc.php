@@ -1002,9 +1002,9 @@ abstract class ThemePlugin extends LazyLoadPlugin
         $firstPublication = $submission->getFirstPublication();
         $earliestDatePublished = $firstPublication->getData('datePublished');
         $params = [
-            'contextIds' => $request->getContext()->getId(),
-            'submissionIds' => $submissionId,
-            'assocTypes' => Application::ASSOC_TYPE_SUBMISSION_FILE,
+            'contextIds' => [$request->getContext()->getId()],
+            'submissionIds' => [$submissionId],
+            'assocTypes' => [Application::ASSOC_TYPE_SUBMISSION_FILE],
             'timelineInterval' => StatisticsHelper::STATISTICS_DIMENSION_MONTH,
             'dateStart' => $earliestDatePublished
         ];
