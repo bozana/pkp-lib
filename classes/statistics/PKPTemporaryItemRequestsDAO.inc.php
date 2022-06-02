@@ -69,7 +69,7 @@ class PKPTemporaryItemRequestsDAO
      *
      * See https://www.projectcounter.org/code-of-practice-five-sections/7-processing-rules-underlying-counter-reporting-data/#counting
      */
-    public function removeUniqueClicks(): void
+    public function compileUniqueClicks(): void
     {
         if (substr(Config::getVar('database', 'driver'), 0, strlen('postgres')) === 'postgres') {
             DB::statement("DELETE FROM {$this->table} usur WHERE EXISTS (SELECT * FROM (SELECT 1 FROM {$this->table} usurt WHERE usurt.load_id = usur.load_id AND usurt.ip = usur.ip AND usurt.user_agent = usur.user_agent AND usurt.context_id = usur.context_id AND usurt.submission_id = usur.submission_id AND EXTRACT(HOUR FROM usurt.date) = EXTRACT(HOUR FROM usur.date) AND usur.line_number < usurt.line_number) AS tmp)");
