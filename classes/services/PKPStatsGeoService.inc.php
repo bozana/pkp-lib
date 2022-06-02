@@ -158,7 +158,7 @@ class PKPStatsGeoService
         // Construct the SQL part depending on the DB
         $monthFormatSql = "DATE_FORMAT(gd.date, '%Y%m')";
         if (substr(Config::getVar('database', 'driver'), 0, strlen('postgres')) === 'postgres') {
-            $monthFormatSql = "to_char(gd.date, 'YYYYMM')";
+            $monthFormatSql = "to_char(gd.date, 'YYYYMM')::integer";
         }
         DB::statement(
             "
