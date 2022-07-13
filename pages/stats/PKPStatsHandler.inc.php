@@ -255,7 +255,7 @@ class PKPStatsHandler extends Handler
             [
                 'timeline' => $timeline,
                 'timelineInterval' => PKPStatisticsHelper::STATISTICS_DIMENSION_DAY,
-                'timelineType' => 'abstract',
+                'timelineType' => 'timeline',
                 'tableColumns' => [
                     [
                         'name' => 'title',
@@ -285,6 +285,11 @@ class PKPStatsHandler extends Handler
                         'name' => 'other',
                         'label' => __('common.other'),
                         'value' => 'otherViews',
+                    ],
+                    [
+                        'name' => 'suppFileViews',
+                        'label' => __('stats.suppFileViews'),
+                        'value' => 'suppFileViews',
                     ],
                     [
                         'name' => 'total',
