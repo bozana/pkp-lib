@@ -892,11 +892,6 @@ abstract class ThemePlugin extends LazyLoadPlugin
     }
 
     /**
-     * Get the context for inclusion of usage stats display related JavaScripts in the submission view page
-     */
-    abstract protected function getSubmissionViewContext(): string;
-
-    /**
      * Add submission's monthly statistics data to the script data output for graph display
      */
     protected function addUsageStatsJavascriptData(array $statsByMonth, int $submissionId): void
@@ -1020,6 +1015,20 @@ abstract class ThemePlugin extends LazyLoadPlugin
     {
         $hash = md5('color' . $num * 2);
         return hexdec(substr($hash, 0, 2)) . ',' . hexdec(substr($hash, 2, 2)) . ',' . hexdec(substr($hash, 4, 2));
+    }
+
+    /**
+     * Get the context for inclusion of usage stats display related JavaScripts in the submission view page
+     */
+    protected function getSubmissionViewContext(): string
+    {
+        if (Application::get()->getName() == 'ojs2') {
+            return 'frontend-article-view';
+        } elseif (Application::get()->getName() == 'omp') {
+            return 'frontend-catalog-book';
+        } elseif (Application::get()->getName() == 'ops') {
+            return 'frontend-preprint-view';
+        }
     }
 }
 
