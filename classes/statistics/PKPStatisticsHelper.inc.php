@@ -70,6 +70,31 @@ abstract class PKPStatisticsHelper
         $fileMgr = new PrivateFileManager();
         return realpath($fileMgr->getBasePath()) . '/usageStats';
     }
+
+    /**
+    * Get document type based on the mimetype
+    * The mimetypes considered here are subset of those used in PKPFileService::getDocumentType()
+    *
+    * @return int One of the StatisticsHelper::STATISTICS_FILE_TYPE_ constants
+    */
+    public static function getDocumentType(string $mimetype): int
+    {
+        switch ($mimetype) {
+           case 'application/pdf':
+           case 'application/x-pdf':
+           case 'text/pdf':
+           case 'text/x-pdf':
+               return self::STATISTICS_FILE_TYPE_PDF;
+           case 'application/msword':
+           case 'application/word':
+           case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+               return self::STATISTICS_FILE_TYPE_DOC;
+           case 'text/html':
+               return self::STATISTICS_FILE_TYPE_HTML;
+           default:
+               return self::STATISTICS_FILE_TYPE_OTHER;
+       }
+    }
 }
 
 if (!PKP_STRICT_MODE) {
