@@ -42,9 +42,8 @@ class UpdateIPGeoDB extends ScheduledTask
         $dbipCityLiteFile = 'https://download.db-ip.com/free/' . $dbipCityLiteFileName;
 
         $fileMgr = new PrivateFileManager();
-        $usageStatsDirPath = PKPStatisticsHelper::getUsageStatsDirPath();
-        $downloadedFile = $usageStatsDirPath . '/' . $dbipCityLiteFileName;
-        $finalFileName = $usageStatsDirPath . '/IPGeoDB.mmdb';
+        $downloadedFile = PKPStatisticsHelper::getUsageStatsDirPath() . '/' . $dbipCityLiteFileName;
+        $finalFileName = PKPStatisticsHelper::getGeoDBPath();
 
         try {
             $client = Application::get()->getHttpClient();
