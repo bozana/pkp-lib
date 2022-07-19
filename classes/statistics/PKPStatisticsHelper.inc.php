@@ -17,6 +17,7 @@
 namespace PKP\statistics;
 
 use GeoIp2\Database\Reader;
+use InvalidArgumentException;
 use PKP\cache\CacheManager;
 use PKP\cache\FileCache;
 use PKP\context\Context;
@@ -207,6 +208,8 @@ abstract class PKPStatisticsHelper
         try {
             $reader = new Reader($this->getGeoDBPath());
         } catch (\MaxMind\Db\Reader\InvalidDatabaseException $e) {
+            error_log('There was a problem reading the Geo database at ' . $this->getGeoDBPath() . '. Error: ' . $e->getMessage());
+        } catch (InvalidArgumentException $e) {
             error_log('There was a problem reading the Geo database at ' . $this->getGeoDBPath() . '. Error: ' . $e->getMessage());
         }
         if (isset($reader)) {

@@ -544,7 +544,7 @@ abstract class Context extends \PKP\core\DataObject
             ($this->getData('enableInstitutionUsageStats') !== null) && !$this->getData('enableInstitutionUsageStats')) {
             $enableInstitutionUsageStats = $this->getData('enableInstitutionUsageStats');
         }
-        return $enableInstitutionUsageStats;
+        return (bool) $enableInstitutionUsageStats;
     }
 }
 

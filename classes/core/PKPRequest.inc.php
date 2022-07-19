@@ -545,9 +545,9 @@ class PKPRequest
     /**
      * Check if the HTTP_DNT (Do Not Track) is set
      */
-    public function isDNTSet(): bool
+    public function getDoNotTrack(): bool
     {
-        return (array_key_exists('HTTP_DNT', $_SERVER) && ((int) $_SERVER['HTTP_DNT'] === 1));
+        return (bool) $_SERVER['HTTP_DNT'] ?? false;
     }
 
     /**

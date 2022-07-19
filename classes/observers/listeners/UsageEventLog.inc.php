@@ -58,7 +58,7 @@ class UsageEventLog
      */
     protected function canHandle(Usage $usageEvent): bool
     {
-        if ($usageEvent->request->isDNTSet()) {
+        if ($usageEvent->request->getDoNotTrack()) {
             return false;
         }
 
