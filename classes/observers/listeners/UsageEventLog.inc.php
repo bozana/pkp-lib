@@ -193,7 +193,11 @@ class UsageEventLog
     }
 
     /**
-     * Get salt
+     * Get salt (used for IP hashing) from the file.
+     * For privacy reasons, the salt will change every day.
+     * When salt changes, the IP hash will change too, so the cach containing the hashed IPs (for Geo and institutions data) will be removed.
+     * If the salt file does not exist, it will be created.
+     * If the salt file exists and it was not modified at the current day the salt will be changed.
      */
     protected function getSalt(string $logFileName): array
     {

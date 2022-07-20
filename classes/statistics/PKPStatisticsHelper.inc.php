@@ -188,7 +188,6 @@ abstract class PKPStatisticsHelper
      */
     public function getLocation(string $ip, string $hashedIp, bool $flush = false): array
     {
-        //$ip = '142.58.100.60';
         if (!isset($this->geoDataCache)) {
             $geoCacheManager = CacheManager::getManager();
             $this->geoDataCache = $geoCacheManager->getCache('geoIP', 'all', [&$this, 'geoDataCacheMiss']);

@@ -60,10 +60,10 @@ class DAO extends EntityDAO
     /**
      * Check if an institution exists with this ID and context ID
      */
-    public function existsInContext(int $id, int $contextId): bool
+    public function existsInContext(int $institutionId, int $contextId): bool
     {
         return DB::table($this->table)
-            ->where($this->primaryKeyColumn, '=', $id)
+            ->where($this->primaryKeyColumn, '=', $institutionId)
             ->where('context_id', '=', $contextId)
             ->exists();
     }
@@ -82,9 +82,9 @@ class DAO extends EntityDAO
     /**
      * @copydoc EntityDAO::get()
      */
-    public function get(int $id): ?Institution
+    public function get(int $institutionId): ?Institution
     {
-        return parent::get($id);
+        return parent::get($institutionId);
     }
 
     /**

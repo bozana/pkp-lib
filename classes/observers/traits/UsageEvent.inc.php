@@ -19,6 +19,7 @@ namespace PKP\observers\traits;
 use APP\core\Application;
 use APP\core\Request;
 use APP\submission\Submission;
+use Exception;
 use Illuminate\Foundation\Events\Dispatchable;
 use PKP\config\Config;
 use PKP\context\Context;
@@ -57,7 +58,24 @@ trait UsageEvent
     /**
      * Create a new usage event instance.
      */
-    protected function constructUsageEvent(int $assocType, Context $context, Submission $submission = null, Representation $representation = null, SubmissionFile $submissionFile = null)
+    protected function traitConstruct(int $assocType, Context $context, Submission $submission = null, Representation $representation = null, SubmissionFile $submissionFile = null)
+    {
+        $this->time = Core::getCurrentDate();
+        $this->assocType = $assocType;
+        $this->context = $context;
+        $this->submission = $submission;
+        $this->representation = $representation;
+        $this->submissionFile = $submissionFile;
+        $this->version = Registry::get('appVersion');
+        $this->canonicalUrl = $this->getCanonicalUrl();
+    }
+
+    /**
+     * Get the canonical URL for the usage object
+     *
+     * @throws Exception
+     */
+    protected function getTraitCanonicalUrl(): string
     {
         $application = Application::get();
         $this->request = $application->getRequest();
@@ -65,11 +83,11 @@ trait UsageEvent
         $canonicalUrlPage = $canonicalUrlOp = null;
         $canonicalUrlParams = [];
 
-        switch ($assocType) {
+        switch ($this->assocType) {
             case Application::ASSOC_TYPE_SUBMISSION_FILE_COUNTER_OTHER:
             case Application::ASSOC_TYPE_SUBMISSION_FILE:
                 $canonicalUrlOp = 'download';
-                $canonicalUrlParams = [$submission->getId()];
+                $canonicalUrlParams = [$this->submission->getId()];
                 $router = $this->request->getRouter(); /** @var PageRouter $router */
                 $op = $router->getRequestedOp($this->request);
                 $args = $router->getRequestedArgs($this->request);
@@ -80,15 +98,15 @@ trait UsageEvent
                         $canonicalUrlParams[] = $publicationId;
                     }
                 }
-                $canonicalUrlParams[] = $representation->getId();
-                $canonicalUrlParams[] = $submissionFile->getId();
+                $canonicalUrlParams[] = $this->representation->getId();
+                $canonicalUrlParams[] = $this->submissionFile->getId();
                 break;
             case Application::ASSOC_TYPE_SUBMISSION:
                 $canonicalUrlOp = 'view';
                 if ($application->getName() == 'omp') {
                     $canonicalUrlOp = 'book';
                 }
-                $canonicalUrlParams = [$submission->getId()];
+                $canonicalUrlParams = [$this->submission->getId()];
                 $router = $this->request->getRouter(); /** @var PageRouter $router */
                 $op = $router->getRequestedOp($this->request);
                 $args = $router->getRequestedArgs($this->request);
@@ -104,23 +122,17 @@ trait UsageEvent
                 $canonicalUrlOp = '';
                 $canonicalUrlPage = 'index';
                 break;
+            default:
+                throw new Exception('Not recognized assoc type that we can create the canonical URL for.');
         }
-        $canonicalUrl = $this->getCanonicalUrl($this->request, $canonicalUrlPage, $canonicalUrlOp, $canonicalUrlParams);
-
-        $this->time = Core::getCurrentDate();
-        $this->assocType = $assocType;
-        $this->canonicalUrl = $canonicalUrl;
-        $this->context = $context;
-        $this->submission = $submission;
-        $this->representation = $representation;
-        $this->submissionFile = $submissionFile;
-        $this->version = Registry::get('appVersion');
+        $canonicalUrl = $this->getRouterCanonicalUrl($this->request, $canonicalUrlPage, $canonicalUrlOp, $canonicalUrlParams);
+        return $canonicalUrl;
     }
 
     /**
-     * Get the canonical URL for the usage object
+     * Construct the URL from page, op, and params
      */
-    protected function getCanonicalUrl(Request $request, string $canonicalUrlPage = null, string $canonicalUrlOp = null, array $canonicalUrlParams = null): string
+    protected function getRouterCanonicalUrl(Request $request, string $canonicalUrlPage = null, string $canonicalUrlOp = null, array $canonicalUrlParams = null): string
     {
         $router = $request->getRouter(); /** @var PageRouter $router */
         $context = $router->getContext($request);

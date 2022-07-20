@@ -13,7 +13,6 @@
 
 namespace PKP\migration\upgrade\v3_4_0;
 
-use APP\core\Application;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -22,6 +21,11 @@ use PKP\migration\Migration;
 
 abstract class I6782_OrphanedMetrics extends Migration
 {
+    private const ASSOC_TYPE_SUBMISSION = 0x0100009;
+    private const ASSOC_TYPE_SUBMISSION_FILE = 0x0000203;
+    private const ASSOC_TYPE_SUBMISSION_FILE_COUNTER_OTHER = 0x0000213;
+
+    abstract protected function getContextAssocType(): int;
     abstract protected function getContextTable(): string;
     abstract protected function getContextKeyField(): string;
     abstract protected function getRepresentationTable(): string;
@@ -40,10 +44,10 @@ abstract class I6782_OrphanedMetrics extends Migration
 
         // Clean orphaned metrics context IDs. These IDs can be deleted.
         // as assoc_id
-        $orphanedIds = DB::table('metrics AS m')->leftJoin($this->getContextTable() . ' AS c', 'm.assoc_id', '=', 'c.' . $this->getContextKeyField())->where('m.assoc_type', '=', Application::getContextAssocType())->whereNull('c.' . $this->getContextKeyField())->distinct()->pluck('m.assoc_id');
+        $orphanedIds = DB::table('metrics AS m')->leftJoin($this->getContextTable() . ' AS c', 'm.assoc_id', '=', 'c.' . $this->getContextKeyField())->where('m.assoc_type', '=', $this->getContextAssocType())->whereNull('c.' . $this->getContextKeyField())->distinct()->pluck('m.assoc_id');
         foreach ($orphanedIds as $contextId) {
             $this->_installer->log("Removing stats for context {$contextId} because no context with that ID could be found.");
-            DB::table('metrics')->where('assoc_type', '=', Application::getContextAssocType())->where('assoc_id', '=', $contextId)->delete();
+            DB::table('metrics')->where('assoc_type', '=', $this->getContextAssocType())->where('assoc_id', '=', $contextId)->delete();
         }
         // as context_id
         $orphanedIds = DB::table('metrics AS m')->leftJoin($this->getContextTable() . ' AS c', 'm.context_id', '=', 'c.' . $this->getContextKeyField())->whereNull('c.' . $this->getContextKeyField())->distinct()->pluck('m.context_id');
@@ -60,22 +64,22 @@ abstract class I6782_OrphanedMetrics extends Migration
         DB::table('metrics')->whereIn('submission_id', $orphanedIds)->delete();
 
         // as assoc_id
-        $orphanedIds = DB::table('metrics AS m')->leftJoin('submissions AS s', 'm.assoc_id', '=', 's.submission_id')->where('m.assoc_type', '=', Application::ASSOC_TYPE_SUBMISSION)->whereNull('s.submission_id')->distinct()->pluck('m.assoc_id');
-        $orphandedSubmissionsAssocId = DB::table('metrics')->select('*')->where('assoc_type', '=', Application::ASSOC_TYPE_SUBMISSION)->whereIn('assoc_id', $orphanedIds);
+        $orphanedIds = DB::table('metrics AS m')->leftJoin('submissions AS s', 'm.assoc_id', '=', 's.submission_id')->where('m.assoc_type', '=', self::ASSOC_TYPE_SUBMISSION)->whereNull('s.submission_id')->distinct()->pluck('m.assoc_id');
+        $orphandedSubmissionsAssocId = DB::table('metrics')->select('*')->where('assoc_type', '=', self::ASSOC_TYPE_SUBMISSION)->whereIn('assoc_id', $orphanedIds);
         DB::table('metrics_tmp')->insertUsing($metricsColumns, $orphandedSubmissionsAssocId);
-        DB::table('metrics')->where('assoc_type', '=', Application::ASSOC_TYPE_SUBMISSION)->whereIn('assoc_id', $orphanedIds)->delete();
+        DB::table('metrics')->where('assoc_type', '=', self::ASSOC_TYPE_SUBMISSION)->whereIn('assoc_id', $orphanedIds)->delete();
 
         // Clean orphaned metrics submission file IDs
-        $orphanedIds = DB::table('metrics AS m')->leftJoin('submission_files AS sf', 'm.assoc_id', '=', 'sf.submission_file_id')->where('m.assoc_type', '=', Application::ASSOC_TYPE_SUBMISSION_FILE)->whereNull('sf.submission_file_id')->distinct()->pluck('m.assoc_id');
-        $orphandedSubmissionFiles = DB::table('metrics')->select('*')->where('assoc_type', '=', Application::ASSOC_TYPE_SUBMISSION_FILE)->whereIn('assoc_id', $orphanedIds);
+        $orphanedIds = DB::table('metrics AS m')->leftJoin('submission_files AS sf', 'm.assoc_id', '=', 'sf.submission_file_id')->where('m.assoc_type', '=', self::ASSOC_TYPE_SUBMISSION_FILE)->whereNull('sf.submission_file_id')->distinct()->pluck('m.assoc_id');
+        $orphandedSubmissionFiles = DB::table('metrics')->select('*')->where('assoc_type', '=', self::ASSOC_TYPE_SUBMISSION_FILE)->whereIn('assoc_id', $orphanedIds);
         DB::table('metrics_tmp')->insertUsing($metricsColumns, $orphandedSubmissionFiles);
-        DB::table('metrics')->where('assoc_type', '=', Application::ASSOC_TYPE_SUBMISSION_FILE)->whereIn('assoc_id', $orphanedIds)->delete();
+        DB::table('metrics')->where('assoc_type', '=', self::ASSOC_TYPE_SUBMISSION_FILE)->whereIn('assoc_id', $orphanedIds)->delete();
 
         // Clean orphaned metrics submission supp file IDs
-        $orphanedIds = DB::table('metrics AS m')->leftJoin('submission_files AS sf', 'm.assoc_id', '=', 'sf.submission_file_id')->where('m.assoc_type', '=', Application::ASSOC_TYPE_SUBMISSION_FILE_COUNTER_OTHER)->whereNull('sf.submission_file_id')->distinct()->pluck('m.assoc_id');
-        $orphandedSubmissionSuppFiles = DB::table('metrics')->select('*')->where('assoc_type', '=', Application::ASSOC_TYPE_SUBMISSION_FILE_COUNTER_OTHER)->whereIn('assoc_id', $orphanedIds);
+        $orphanedIds = DB::table('metrics AS m')->leftJoin('submission_files AS sf', 'm.assoc_id', '=', 'sf.submission_file_id')->where('m.assoc_type', '=', self::ASSOC_TYPE_SUBMISSION_FILE_COUNTER_OTHER)->whereNull('sf.submission_file_id')->distinct()->pluck('m.assoc_id');
+        $orphandedSubmissionSuppFiles = DB::table('metrics')->select('*')->where('assoc_type', '=', self::ASSOC_TYPE_SUBMISSION_FILE_COUNTER_OTHER)->whereIn('assoc_id', $orphanedIds);
         DB::table('metrics_tmp')->insertUsing($metricsColumns, $orphandedSubmissionSuppFiles);
-        DB::table('metrics')->where('assoc_type', '=', Application::ASSOC_TYPE_SUBMISSION_FILE_COUNTER_OTHER)->whereIn('assoc_id', $orphanedIds)->delete();
+        DB::table('metrics')->where('assoc_type', '=', self::ASSOC_TYPE_SUBMISSION_FILE_COUNTER_OTHER)->whereIn('assoc_id', $orphanedIds)->delete();
 
         // Clean orphaned metrics representation IDs
         $orphanedIds = DB::table('metrics AS m')->leftJoin($this->getRepresentationTable() . ' AS r', 'm.representation_id', '=', 'r.' . $this->getRepresentationKeyField())->whereNotNull('m.representation_id')->whereNull('r.' . $this->getRepresentationKeyField())->distinct()->pluck('m.representation_id');

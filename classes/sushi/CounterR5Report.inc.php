@@ -189,14 +189,13 @@ abstract class CounterR5Report
     public function processReportParams($request, $params): void
     {
         $this->context = $request->getContext();
+        $this->setPlatform($request->getSite());
 
         $this->checkRequiredParams($params);
 
         $this->checkCustomerId($params);
 
         $this->checkDate($params);
-
-        $this->setPlatform($request->getSite());
 
         $this->checkSupportedParams($params);
 
@@ -240,7 +239,7 @@ abstract class CounterR5Report
             $missingRequiredParams[] = 'end_date';
         }
         if (!empty($missingRequiredParams)) {
-            throw new SuhiException(
+            throw new SushiException(
                 'Insufficient Information to Process Request',
                 1030,
                 'Fatal',
@@ -264,7 +263,7 @@ abstract class CounterR5Report
                 $institutionName = 'The World';
             } else {
                 $institution = Repo::institution()->get($customerId);
-                if (isset($institution) && $institution->getContextId() == $this->context) {
+                if (isset($institution) && $institution->getContextId() == $this->context->getId()) {
                     $institutionId = [];
                     $institutionName = $institution->getLocalizedName();
                     $ror = $institution->getROR();

@@ -32,7 +32,7 @@ class InstitutionsMigration extends \PKP\migration\Migration
             $table->string('ror', 255)->nullable();
             $table->softDeletes('deleted_at', 0);
             $contextDao = Application::getContextDAO();
-            $table->foreign('context_id')->references($contextDao->primaryKeyColumn)->on($contextDao->tableName);
+            $table->foreign('context_id')->references($contextDao->primaryKeyColumn)->on($contextDao->tableName)->onDelete('cascade');
         });
 
         // Locale-specific institution data
@@ -41,7 +41,7 @@ class InstitutionsMigration extends \PKP\migration\Migration
             $table->string('locale', 14)->default('');
             $table->string('setting_name', 255);
             $table->text('setting_value')->nullable();
-            $table->foreign('institution_id')->references('institution_id')->on('institutions');
+            $table->foreign('institution_id')->references('institution_id')->on('institutions')->onDelete('cascade');
             $table->index(['institution_id'], 'institution_settings_institution_id');
             $table->unique(['institution_id', 'locale', 'setting_name'], 'institution_settings_pkey');
         });
@@ -53,7 +53,7 @@ class InstitutionsMigration extends \PKP\migration\Migration
             $table->string('ip_string', 40);
             $table->bigInteger('ip_start');
             $table->bigInteger('ip_end')->nullable();
-            $table->foreign('institution_id')->references('institution_id')->on('institutions');
+            $table->foreign('institution_id')->references('institution_id')->on('institutions')->onDelete('cascade');
             $table->index(['institution_id'], 'institution_ip_institution_id');
             $table->index(['ip_start'], 'institution_ip_start');
             $table->index(['ip_end'], 'institution_ip_end');

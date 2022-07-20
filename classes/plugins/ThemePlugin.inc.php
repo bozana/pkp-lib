@@ -26,6 +26,7 @@ use APP\template\TemplateManager;
 use Exception;
 use PKP\cache\CacheManager;
 use PKP\cache\FileCache;
+use PKP\config\Config;
 use PKP\context\Context;
 use PKP\core\Core;
 use PKP\core\PKPApplication;
@@ -924,9 +925,10 @@ abstract class ThemePlugin extends LazyLoadPlugin
         $templateMgr = TemplateManager::getManager($request);
 
         // Register Chart.js on the frontend article view
+        $min = Config::getVar('general', 'enable_minified') ? '.min' : '';
         $templateMgr->addJavaScript(
             'chartJS',
-            'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.0.1/Chart.js',
+            $request->getBaseUrl() . '/lib/pkp/js/lib/Chart' . $min . '.js',
             [
                 'contexts' => $this->getSubmissionViewContext(),
             ]
@@ -981,7 +983,7 @@ abstract class ThemePlugin extends LazyLoadPlugin
         return [
             'data' => $statsByMonth,
             'label' => __('common.allDownloads'),
-            'color' => $this->getUsageStatsDispalyColor(REALLY_BIG_NUMBER),
+            'color' => $this->getUsageStatsDisplayColor(REALLY_BIG_NUMBER),
             'total' => $totalDownloads
         ];
     }
@@ -1011,7 +1013,7 @@ abstract class ThemePlugin extends LazyLoadPlugin
     /**
      * Return a color RGB code to be used in the usage statistics diplay graph.
      */
-    protected function getUsageStatsDispalyColor(int $num): string
+    protected function getUsageStatsDisplayColor(int $num): string
     {
         $hash = md5('color' . $num * 2);
         return hexdec(substr($hash, 0, 2)) . ',' . hexdec(substr($hash, 2, 2)) . ',' . hexdec(substr($hash, 4, 2));

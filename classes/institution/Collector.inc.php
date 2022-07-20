@@ -92,7 +92,7 @@ class Collector implements CollectorInterface
      */
     public function getQueryBuilder(): Builder
     {
-        $qb = DB::table($this->dao->table . ' as i');
+        $qb = DB::table($this->dao->table . ' as i')->select('i.*');
 
         if (!is_null($this->contextIds)) {
             $qb->whereIn('i.context_id', $this->contextIds);
@@ -158,8 +158,6 @@ class Collector implements CollectorInterface
                 });
             }
         }
-
-        //$qb->select('i.*')->get();
 
         if (!is_null($this->count)) {
             $qb->limit($this->count);
