@@ -48,13 +48,13 @@ class PKPContextStatisticsForm extends FormComponent
         ];
         $geoOptions = [];
         foreach ($possibleGeoOptions as $value => $label) {
-            if ($site->getData('enableGeoUsageStats') === $value) {
-                break;
-            }
             $geoOptions[] = [
                 'value' => $value,
                 'label' => $label,
             ];
+            if ($site->getData('enableGeoUsageStats') === $value) {
+                break;
+            }
         }
 
         if ($site->getData('enableGeoUsageStats') && $site->getData('enableGeoUsageStats') !== 'disabled') {
