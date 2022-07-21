@@ -116,8 +116,8 @@ class PKPStatsSushiHandler extends APIHandler
             ], 400);
         }
         $platformId = $context->getPath();
-        if ($site->getData('siteSushiPlatform')) {
-            $platformId = $site->getData('siteSushiPlatformID');
+        if ($site->getData('isSiteSushiPlatform')) {
+            $platformId = $site->getData('sushiPlatformID');
         }
         $institutionName = $institutionId = null;
         $customerId = $params['customer_id'];

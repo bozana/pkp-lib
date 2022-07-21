@@ -211,11 +211,11 @@ abstract class CounterR5Report
     {
         $platformName = $this->context->getName($this->context->getPrimaryLocale());
         $platformId = $this->context->getPath();
-        if ($site->getData('siteSushiPlatform')) {
+        if ($site->getData('isSiteSushiPlatform')) {
             if ($site->getData('title')) {
                 $platformName = $site->getTitle($site->getPrimaryLocale());
             }
-            $platformId = $site->getData('siteSushiPlatformID');
+            $platformId = $site->getData('sushiPlatformID');
         }
         $this->platformName = $platformName;
         $this->platformId = $platformId;
