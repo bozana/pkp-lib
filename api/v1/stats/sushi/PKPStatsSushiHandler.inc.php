@@ -89,7 +89,7 @@ class PKPStatsSushiHandler extends APIHandler
     {
         $request = $this->getRequest();
         $context = $request->getContext();
-        // use only the name in the contxt primary locale to be consistent
+        // use only the name in the context primary locale to be consistent
         $contextName = $context->getName($context->getPrimaryLocale());
         return $response->withJson([
             'Description' => __('sushi.status.description', ['contextName' => $contextName]),
