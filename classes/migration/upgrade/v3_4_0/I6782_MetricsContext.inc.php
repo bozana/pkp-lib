@@ -13,7 +13,6 @@
 
 namespace PKP\migration\upgrade\v3_4_0;
 
-use APP\migration\install\MetricsMigration;
 use Illuminate\Support\Facades\DB;
 use PKP\config\Config;
 use PKP\install\DowngradeNotSupportedException;
@@ -29,9 +28,6 @@ abstract class I6782_MetricsContext extends Migration
      */
     public function up(): void
     {
-        $metricsMigrations = new MetricsMigration($this->_installer, $this->_attributes);
-        $metricsMigrations->up();
-
         $dayFormatSql = "DATE_FORMAT(STR_TO_DATE(m.day, '%Y%m%d'), '%Y-%m-%d')";
         if (substr(Config::getVar('database', 'driver'), 0, strlen('postgres')) === 'postgres') {
             $dayFormatSql = "to_date(m.day, 'YYYYMMDD')";
