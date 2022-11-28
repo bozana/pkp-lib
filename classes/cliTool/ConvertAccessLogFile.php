@@ -1,22 +1,16 @@
 <?php
 
 /**
- * @file tools/convertUsageStatsLogFile.php
+ * @file tools/convertAccessLogFile.php
  *
  * Copyright (c) 2022 Simon Fraser University
  * Copyright (c) 2022 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
- * @class ConvertUsageStatsLogFile
+ * @class ConvertAccessLogFile
  * @ingroup tools
  *
- * @brief CLI tool to convert the following log files into the new format:
- * - old usage stats log file created in releases 3.0 to 3.3 by UsageStatsPlugin,
- * - apache access log files.
- * This tool cannot be used to convert the very old usage stats log files from the releases 2.x:
- * Back than the URL pattern 'article/view' was also associated with galleys (article/view/{$articleId}/{$galleyId}).
- * This was refactored with the release 3.0m where assoc type galley was removed and all the stats in the DB
- * appropriatelly moved to the assoc type submission file.
+ * @brief CLI tool to convert the apache access log files into the new format.
  */
 
 namespace PKP\cliTool;
@@ -33,7 +27,7 @@ use PKP\file\FileManager;
 use PKP\submission\Genre;
 use PKP\task\FileLoader;
 
-class ConvertUsageStatsLogFile extends \PKP\cliTool\CommandLineTool
+class ConvertAccessLogFile extends \PKP\cliTool\CommandLineTool
 {
     /**
      * Weather the URL parameters are used instead of CGI PATH_INFO.

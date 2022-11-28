@@ -22,12 +22,16 @@
 require(dirname(__FILE__, 4) . '/tools/bootstrap.php');
 
 use APP\core\Application;
+use APP\facades\Repo;
 use APP\statistics\StatisticsHelper;
+use PKP\cliTool\ConvertLogFile;
+use PKP\db\DAORegistry;
 use PKP\file\FileManager;
 use PKP\statistics\PKPStatisticsHelper;
+use PKP\submission\Genre;
 use PKP\task\FileLoader;
 
-class PrepareAccessLogFile extends \PKP\cliTool\CommandLineTool
+class PrepareAccessLogFile extends ConvertLogFile
 {
     /**
      * Path to the egrep program, required for this tool to work, e.g. '/bin/egrep'
@@ -50,8 +54,8 @@ class PrepareAccessLogFile extends \PKP\cliTool\CommandLineTool
      * If the apache log files are in different format the correct regex needs to be entered here, so
      * that the following information can be extracted, in the given order: IP, date, URL, return code, user agent
      */
-    public const PARSEREGEX = '/^(\S+) \S+ \S+ \[(.*?)\] "\S+ (\S+) \S+" (\S+) \S+ \S+ "(.*?)"/';
-
+    //public const PARSEREGEX = '/^(\S+) \S+ \S+ \[(.*?)\] "\S+ (\S+) \S+" (\S+) \S+ \S+ "(.*?)"/';
+    public const PARSEREGEX = '/^(?P<ip>\S+) \S+ \S+ \[(?P<date>.*?)\] "\S+ (?P<url>\S+).*?" (?P<returnCode>\S+) \S+ ".*?" "(?P<userAgent>.*?)"/';
     /**
      * PHP format of the time in the log file.
      * S. https://www.php.net/manual/en/datetime.format.php
@@ -68,17 +72,6 @@ class PrepareAccessLogFile extends \PKP\cliTool\CommandLineTool
      */
     public const PHPDATEFORMAT = 'd/M/Y';
 
-    /**
-     * Processing temporary directory
-     */
-    public string $tmpDir;
-
-    /**
-     * List of this installation context paths,
-     * shell escaped and separated by '|'
-     */
-    public string $contextPaths;
-
 
     /**
      * Constructor.
@@ -93,24 +86,33 @@ class PrepareAccessLogFile extends \PKP\cliTool\CommandLineTool
             exit(1);
         }
 
-        $this->tmpDir = PKPStatisticsHelper::getUsageStatsDirPath() . '/tmp';
 
         // This tool needs egrep path configured.
         if (self::EGREP_PATH == '') {
             echo __('admin.error.executingUtil') . "\n";
             exit(1);
         }
+    }
 
-        // Get a list of context paths.
-        $contextDao = Application::getContextDAO(); /** @var ContextDAO $contextDao */
-        $contextFactory = $contextDao->getAll();
-        $contextPaths = [];
-        while ($context = $contextFactory->next()) {
-            /** @var Context $context */
-            $contextPaths[] = escapeshellarg($context->getPath());
-        }
-        $contextPaths = implode('/|/', $contextPaths);
-        $this->contextPaths = $contextPaths;
+    public function getProcessingDir(): string
+    {
+        return PKPStatisticsHelper::getUsageStatsDirPath() . '/tmp';
+    }
+    public function getParseRegex(): string
+    {
+        return self::PARSEREGEX;
+    }
+    public function getPhpDateTimeFormat(): string
+    {
+        return self::PHPDATETIMEFORMAT;
+    }
+    public function getPathInfoDisabled(): bool
+    {
+        return self::PATHINFODISABLED;
+    }
+    public function isApacheAccessLogFile(): bool
+    {
+        return true;
     }
 
     /**
@@ -125,17 +127,17 @@ class PrepareAccessLogFile extends \PKP\cliTool\CommandLineTool
      * Prepare apache access log files for reprocessing.
      * Can work with both a specific file or a directory.
      */
-    public function execute()
+    public function execute(): void
     {
         $fileMgr = new FileManager();
         $filePath = current($this->argv);
 
-        if ($fileMgr->fileExists($this->tmpDir, 'dir')) {
-            $fileMgr->rmtree($this->tmpDir);
+        if ($fileMgr->fileExists($this->getProcessingDir(), 'dir')) {
+            $fileMgr->rmtree($this->getProcessingDir());
         }
 
-        if (!$fileMgr->mkdir($this->tmpDir)) {
-            printf(__('admin.copyAccessLogFileTool.error.creatingFolder', ['tmpDir' => $this->tmpDir]) . "\n");
+        if (!$fileMgr->mkdir($this->getProcessingDir())) {
+            printf(__('admin.copyAccessLogFileTool.error.creatingFolder', ['tmpDir' => $this->getProcessingDir()]) . "\n");
             exit(1);
         }
 
@@ -162,7 +164,7 @@ class PrepareAccessLogFile extends \PKP\cliTool\CommandLineTool
             }
         }
 
-        //$fileMgr->rmtree($this->tmpDir);
+        //$fileMgr->rmtree($this->getProcessingDir());
     }
 
     /**
@@ -190,7 +192,7 @@ class PrepareAccessLogFile extends \PKP\cliTool\CommandLineTool
     public function copyFile(string $filePath): string
     {
         $fileName = pathinfo($filePath, PATHINFO_BASENAME);
-        $tmpFilePath = "{$this->tmpDir}/{$fileName}";
+        $tmpFilePath = "{$this->getProcessingDir()}/{$fileName}";
         $fileMgr = new FileManager();
         if (!$fileMgr->copyFile($filePath, $tmpFilePath)) {
             echo __('admin.copyAccessLogFileTool.error.copyingFile', ['filePath' => $filePath, 'tmpFilePath' => $tmpFilePath]) . "\n";
@@ -224,9 +226,11 @@ class PrepareAccessLogFile extends \PKP\cliTool\CommandLineTool
 
         // Each context path is already escaped, see the constructor.
         $filteredFilePath = $filePath . '_tmp';
+        $escapedContextPaths = implode('/|/', array_map('escapeshellarg', $this->contextsByPath));
+        $contextPaths = implode('/|/', $contextPaths);
         $output = null;
         $returnValue = 0;
-        exec(self::EGREP_PATH . " -i '" . $this->contextPaths . "' " . escapeshellarg($filePath) . ' > ' . escapeshellarg($filteredFilePath), $output, $returnValue);
+        exec(escapeshellarg(self::EGREP_PATH) . " -i '" . $escapedContextPaths . "' " . escapeshellarg($filePath) . ' > ' . escapeshellarg($filteredFilePath), $output, $returnValue);
         if ($returnValue > 1) {
             printf(__('admin.error.executingUtil', ['utilPath' => self::EGREP_PATH, 'utilVar' => 'egrep']) . "\n");
             exit(1);
@@ -295,10 +299,10 @@ class PrepareAccessLogFile extends \PKP\cliTool\CommandLineTool
                 echo "Warning: One or more files apache_usage_events_{$day}.log already exist. You will need to clean or merge them into one before reprocessing them.\n";
             }
             $dailyFileName = 'apache_usage_events_' . $day . $countPartOfFileName . '.log';
-            $dayFilePath = $this->tmpDir . '/' . $dailyFileName;
+            $dayFilePath = $this->getProcessingDir() . '/' . $dailyFileName;
             $output = null;
             $returnValue = 0;
-            exec(self::EGREP_PATH . " -i '" . preg_quote($value->format(self::PHPDATEFORMAT)) . "' " . escapeshellarg($filePath) . ' > ' . escapeshellarg($dayFilePath), $output, $returnValue);
+            exec(escapeshellarg(self::EGREP_PATH) . " -i '" . preg_quote($value->format(self::PHPDATEFORMAT)) . "' " . escapeshellarg($filePath) . ' > ' . escapeshellarg($dayFilePath), $output, $returnValue);
             if ($returnValue > 1) {
                 echo "could not split the file by day\n";
                 exit(1);
@@ -317,24 +321,11 @@ class PrepareAccessLogFile extends \PKP\cliTool\CommandLineTool
     }
 
     /**
-     * Convert the access log file into the new JSON usage stats log file format.
-     */
-    public function convert(string $fileName): void
-    {
-        $convertTool = new \PKP\cliTool\ConvertUsageStatsLogFile(['lib/pkp/tools/convertUsageStatsLogFile.php', $fileName]);
-        $convertTool->setParseRegex(self::PARSEREGEX);
-        $convertTool->setPathInfoDisabled(self::PATHINFODISABLED);
-        $convertTool->setPhpDateTimeFormat(self::PHPDATETIMEFORMAT);
-        $convertTool->setIsApacheAccessLogFile(true);
-        $convertTool->execute();
-    }
-
-    /**
      * Copy the file from the folder usageStats/tmp/ into usageStats/archive/.
      */
     public function archive(string $fileName): void
     {
-        $tmpFilePath = "{$this->tmpDir}/{$fileName}";
+        $tmpFilePath = "{$this->getProcessingDir()}/{$fileName}";
         $archiveFilePath = StatisticsHelper::getUsageStatsDirPath() . '/' . FileLoader::FILE_LOADER_PATH_ARCHIVE . '/' . $fileName;
         $fileMgr = new FileManager();
         if (!$fileMgr->copyFile($tmpFilePath, $archiveFilePath)) {
@@ -342,6 +333,373 @@ class PrepareAccessLogFile extends \PKP\cliTool\CommandLineTool
             exit(1);
         }
         echo "File {$tmpFilePath} successfully archived to {$archiveFilePath}.\n";
+    }
+
+    /**
+    * Get the expected page and operation.
+    * They are grouped by the object type constant that
+    * they give access to.
+    */
+    protected function getExpectedPageAndOp(): array
+    {
+        $pageAndOp = [
+            Application::getContextAssocType() => [
+                'index/index'
+            ]
+        ];
+        $application = Application::get();
+        $applicationName = $application->getName();
+        switch ($applicationName) {
+            case 'ojs2':
+                $pageAndOp = $pageAndOp + [
+                    Application::ASSOC_TYPE_SUBMISSION_FILE => [
+                        'article/download', 'article/downloadSuppFile', 'article/viewFile'],
+                    Application::ASSOC_TYPE_SUBMISSION => [
+                        'article/view', 'article/viewArticle'],
+                    Application::ASSOC_TYPE_ISSUE => [
+                        'issue/view'],
+                    Application::ASSOC_TYPE_ISSUE_GALLEY => [
+                        'issue/download', 'issue/viewFile']
+                ];
+                $pageAndOp[Application::getContextAssocType()][] = 'index';
+                break;
+            case 'omp':
+                $pageAndOp = $pageAndOp + [
+                    Application::ASSOC_TYPE_SUBMISSION_FILE => [
+                        'catalog/download'],
+                    Application::ASSOC_TYPE_MONOGRAPH => [
+                        'catalog/book'],
+                    Application::ASSOC_TYPE_SERIES => [
+                        'catalog/series']
+                ];
+                $pageAndOp[Application::getContextAssocType()][] = 'catalog/index';
+                break;
+            case 'ops':
+                $pageAndOp = $pageAndOp + [
+                    Application::ASSOC_TYPE_SUBMISSION_FILE => [
+                        'preprint/download'],
+                    Application::ASSOC_TYPE_SUBMISSION => [
+                        'preprint/view']
+                ];
+                $pageAndOp[Application::getContextAssocType()][] = 'index';
+                break;
+            default:
+                throw new Exception('Unrecognized application name.');
+        }
+        return $pageAndOp;
+    }
+
+    /**
+     * Set assoc type and IDs from the passed page, operation and arguments.
+     */
+    protected function setAssoc(int $assocType, string $op, array $args, array &$newEntry): void
+    {
+        switch ($assocType) {
+            case Application::ASSOC_TYPE_SUBMISSION_FILE:
+                if (!isset($args[0]) || !isset($args[1])) {
+                    echo "Missing URL parameter.\n";
+                    break;
+                }
+                // If it is an older submission version, the arguments must be:
+                // $submissionId/version/$publicationId/$representationId/$submissionFileId.
+                // Consider also this issue: https://github.com/pkp/pkp-lib/issues/6573
+                // where apache log files can contain URL download/$submissionId/$representationId, i.e. without $submissionFileId argument.
+                // Also the URLs from releases 2.x will not have submissionFileId.
+                $publicationId = $submissionFileId = null; // do not necessarily exist
+                if (in_array('version', $args)) {
+                    if ($args[1] !== 'version' || !isset($args[2]) || !isset($args[3])) {
+                        // if version is there, there must be $publicationId and $representationId arguments
+                        break;
+                    }
+                    $publicationId = (int) $args[2];
+                    $representationUrlPath = $args[3];
+                    if (isset($args[4])) {
+                        $submissionFileId = (int) $args[4];
+                    }
+                } else {
+                    $representationUrlPath = $args[1];
+                    if (isset($args[2])) {
+                        $submissionFileId = (int) $args[2];
+                    }
+                }
+
+                $submission = Repo::submission()->getByBestId($args[0], $newEntry['contextId']);
+                if (!$submission) {
+                    echo "Submission with the URL path or ID {$args[0]} does not exist in the context (journal, press or server) with the ID {$newEntry['contextId']}.\n";
+                    break;
+                }
+                $submissionId = $submission->getId();
+
+                // Find the galley and representation ID
+                $representationId = $galley = null;
+                if (is_int($representationUrlPath) || ctype_digit($representationUrlPath)) {
+                    // assume it is ID and not the URL path
+                    $representationId = (int) $representationUrlPath;
+                    $galley = Repo::galley()->get($representationId);
+                    if (!$galley) {
+                        echo "Represantation (galley or publication format) with the ID {$representationUrlPath} does not exist.\n";
+                        break;
+                    }
+                } else {
+                    // We need to get the publication in order to be able to get galley by URL path
+                    $publications = $submission->getData('publications');
+                    if (isset($publicationId)) {
+                        $publication = $publications->first(function ($value, $key) use ($publicationId) {
+                            return $value->getId() == $publicationId;
+                        });
+                        if (!$publication) {
+                            echo "Publication (submission version) with the ID {$publicationId} does not exist in the submission with the ID {$submissionId}.\n";
+                            break;
+                        }
+                        $galley = Repo::galley()->getByUrlPath($representationUrlPath, $publication);
+                        if (!$galley) {
+                            echo "Represantation (galley or publication format) with the URL path {$representationUrlPath} does not exist in the submission with the ID {$submissionId}.\n";
+                            break;
+                        }
+                        $representationId = $galley->getId();
+                    } else {
+                        // We cannot assume that this is the current publication,
+                        // because the log entry can be long time ago, and
+                        // since then there could be new submission versions created,
+                        // so take the first publication and galley found with the given representationUrlPath.
+                        $possibleGalleys = [];
+                        foreach ($publications as $publication) {
+                            foreach ($publication->getData('galleys') as $publicationGalley) {
+                                if ($publicationGalley->getBestGalleyId() == $representationUrlPath) {
+                                    $possibleGalleys[] = $publicationGalley;
+                                    if (isset($submissionFileId) && $publicationGalley->getData('submissionFileId') == $submissionFileId) {
+                                        $galley = $publicationGalley;
+                                        $representationId = $publicationGalley->getId();
+                                        break 2;
+                                    }
+                                }
+                            }
+                        }
+                        if (empty($possibleGalleys)) {
+                            echo "Represantation (galley or publication format) with the URL path {$representationUrlPath} does not exist in the submission with the ID {$submissionId}.\n";
+                            break;
+                        }
+                        // if no matching galley has been found yet, take the first possible
+                        if (!isset($representationId)) {
+                            $galley = $possibleGalleys[0];
+                            $representationId = $galley->getId();
+                        }
+                    }
+                }
+
+                switch (Application::get()->getName()) {
+                    case 'ojs2':
+                    case 'ops':
+                        // consider this issue: https://github.com/pkp/pkp-lib/issues/6573
+                        // apache log files contain URL download/submissionId/galleyId, i.e. without third argument
+                        if (!$submissionFileId) {
+                            $submissionFileId = $galley->getData('submissionFileId');
+                        }
+                        break;
+                    case 'omp':
+                        // TO-DO: check OMP!!!
+                        if (!isset($args[2])) {
+                            echo "Missing URL parameter.\n";
+                            break 2;
+                        } else {
+                            $submissionFileId = (int) $args[2];
+                        }
+                        break;
+                    default:
+                        throw new Exception('Unrecognized application name!');
+                }
+
+                $submissionFile = Repo::submissionFile()->get($submissionFileId, $submissionId);
+                if (!$submissionFile) {
+                    echo "Submission file with the ID {$submissionFileId} does not exist in the submission with the ID {$submissionId}.\n";
+                    break;
+                }
+                if ($galley->getData('submissionFileId') != $submissionFileId) {
+                    echo "Submission file with the ID {$submissionFileId} does not belong to the represantation (galley or publication format) with the ID {$representationId}.\n";
+                    break;
+                }
+
+                // is this a full text or supp file
+                $genreDao = DAORegistry::getDAO('GenreDAO');
+                $genre = $genreDao->getById($submissionFile->getData('genreId'));
+                if ($genre->getCategory() != Genre::GENRE_CATEGORY_DOCUMENT || $genre->getSupplementary() || $genre->getDependent()) {
+                    $newEntry['assocType'] = Application::ASSOC_TYPE_SUBMISSION_FILE_COUNTER_OTHER;
+                } else {
+                    $newEntry['assocType'] = $assocType;
+                }
+                $newEntry['submissionId'] = $submissionId;
+                $newEntry['representationId'] = $representationId;
+                $newEntry['submissionFileId'] = $submissionFileId;
+                $newEntry['fileType'] = StatisticsHelper::getDocumentType($submissionFile->getData('mimetype'));
+                break;
+
+            case Application::ASSOC_TYPE_SUBMISSION:
+                if (!isset($args[0])) {
+                    echo "Missing URL parameter.\n";
+                    break;
+                }
+                $submission = Repo::submission()->getByBestId($args[0], $newEntry['contextId']);
+                if (!$submission) {
+                    echo "Submission with the URL path or ID {$args[0]} does not exist in the context (journal, press or server) with the ID {$newEntry['contextId']}.\n";
+                    break;
+                }
+                $submissionId = $submission->getId();
+
+                // If it is an older submission version, the arguments must be:
+                // $submissionId/version/$publicationId.
+                // Consider also releases 2.x where log files can contain URL
+                // view/$submissionId/$representationId i.e. without $submissionFileId argument
+                $publicationId = null;
+                if (in_array('version', $args)) {
+                    if ($args[1] !== 'version' || !isset($args[2])) {
+                        break;
+                    }
+                    $publicationId = (int) $args[2];
+                } elseif (count($args) == 2) {
+                    // Consider usage stats log files from releases 2.x:
+                    // The URL article/view/{$articleId}/{$galleyId} was used for assoc type galley, HTML and remote galleys.
+                    // Those should now be assoc type submission file.
+                    $representationUrlPath = $args[1];
+                    $galley = $representationId = null;
+                    if (is_int($representationUrlPath) || ctype_digit($representationUrlPath)) {
+                        // assume it is ID and not the URL path
+                        $representationId = (int) $representationUrlPath;
+                        $galley = Repo::galley()->get($representationId);
+                        if (!$galley) {
+                            echo "Represantation (galley or publication format) with the ID {$representationUrlPath} does not exist.\n";
+                            break;
+                        }
+                    } else {
+                        // We need to get the publication in order to be able to get galley by URL path
+                        // We cannot assume that this is the current publication,
+                        // because the log entry can be long time ago, and
+                        // since then there could be new submission versions created,
+                        // so take the first publication and galley found with the given representationUrlPath.
+                        // It is not accurate but only possible.
+                        $publications = $submission->getData('publications');
+                        foreach ($publications as $publication) {
+                            foreach ($publication->getData('galleys') as $publicationGalley) {
+                                if ($publicationGalley->getBestGalleyId() == $representationUrlPath) {
+                                    $galley = $publicationGalley;
+                                    $representationId = $publicationGalley->getId();
+                                    break 2;
+                                }
+                            }
+                        }
+                        if (!isset($galley)) {
+                            echo "Represantation (galley or publication format) with the URL path {$representationUrlPath} does not exist in the submission with the ID {$submissionId}.\n";
+                            break;
+                        }
+                        $submissionFileId = $galley->getData('submissionFileId');
+                        if (!$submissionFileId) {
+                            // it is a remote galley from releases 2.x
+                            break;
+                        }
+                        $submissionFile = Repo::submissionFile()->get($submissionFileId, $submissionId);
+                        $fileType = StatisticsHelper::getDocumentType($submissionFile->getData('mimetype'));
+                        if ($fileType == StatisticsHelper::STATISTICS_FILE_TYPE_PDF) {
+                            // Do not consider PDF file, the download URL will follow
+                            break;
+                        }
+                        // is this a full text or supp file
+                        // it should be only full texts but do the check however
+                        $genreDao = DAORegistry::getDAO('GenreDAO');
+                        $genre = $genreDao->getById($submissionFile->getData('genreId'));
+                        if ($genre->getCategory() != Genre::GENRE_CATEGORY_DOCUMENT || $genre->getSupplementary() || $genre->getDependent()) {
+                            $newEntry['assocType'] = Application::ASSOC_TYPE_SUBMISSION_FILE_COUNTER_OTHER;
+                        } else {
+                            $newEntry['assocType'] = Application::ASSOC_TYPE_SUBMISSION_FILE;
+                        }
+                        $newEntry['submissionId'] = $submissionId;
+                        $newEntry['representationId'] = $representationId;
+                        $newEntry['submissionFileId'] = $submissionFileId;
+                        $newEntry['fileType'] = $fileType;
+                        break;
+                    }
+                }
+                if ($publicationId && !Repo::publication()->exists($publicationId, $submissionId)) {
+                    echo "Publication (submission version) with the ID {$publicationId} does not exist in the submission with the ID {$submissionId}.\n";
+                    break;
+                }
+                $newEntry['submissionId'] = $submissionId;
+                $newEntry['assocType'] = $assocType;
+                break;
+
+            case Application::getContextAssocType():
+                // $newEntry['contextId'] has already been set
+                $newEntry['assocType'] = $assocType;
+                break;
+        }
+
+        if (!array_key_exists('assocType', $newEntry)) {
+            $application = Application::get();
+            $applicationName = $application->getName();
+            switch ($applicationName) {
+                case 'ojs2':
+                    $this->setOJSAssoc($assocType, $args, $newEntry);
+                    break;
+                case 'omp':
+                    $this->setOMPAssoc($assocType, $args, $newEntry);
+                    break;
+                case 'ops':
+                    break; // noop
+                default:
+                    throw new Exception('Unrecognized application name!');
+            }
+        }
+    }
+
+    /**
+     * Set assoc type and IDs from the passed page, operation and
+     * arguments specific to OJS.
+     */
+    protected function setOJSAssoc(int $assocType, array $args, array &$newEntry): void
+    {
+        switch ($assocType) {
+            case Application::ASSOC_TYPE_ISSUE:
+                if (!isset($args[0])) {
+                    echo "Missing URL parameter.\n";
+                    break;
+                }
+                // Consider issue https://github.com/pkp/pkp-lib/issues/6611
+                // where apache log files contain both URLs for issue galley download:
+                // issue/view/issueId/galleyId (that should not be considered here), as well as
+                // issue/download/issueId/galleyId
+                if (count($args) != 1) {
+                    break;
+                }
+                $issue = Repo::issue()->getByBestId($args[0], $newEntry['contextId']);
+                if (!$issue) {
+                    echo "Issue with the URL path or ID {$args[0]} does not exist in the journal with the ID {$newEntry['contextId']}.\n";
+                    break;
+                }
+                $issueId = $issue->getId();
+                $newEntry['issueId'] = $issueId;
+                $newEntry['assocType'] = $assocType;
+                break;
+
+            case Application::ASSOC_TYPE_ISSUE_GALLEY:
+                if (!isset($args[0]) || !isset($args[1])) {
+                    echo "Missing URL parameter.\n";
+                    break;
+                }
+                $issueGalleyDao = DAORegistry::getDAO('IssueGalleyDAO');
+                $issue = Repo::issue()->getByBestId($args[0], $newEntry['contextId']);
+                if (!$issue) {
+                    echo "Issue with the URL path or ID {$args[0]} does not exist in the journal with the ID {$newEntry['contextId']}.\n";
+                    break;
+                }
+                $issueId = $issue->getId();
+                $issueGalley = $issueGalleyDao->getByBestId($args[1], $issueId);
+                if (!$issueGalley) {
+                    echo "Issue galley with the URL path or ID {$args[1]} does not exist in the issue with the ID {$issueId}.\n";
+                    break;
+                }
+                $newEntry['issueId'] = $issueId;
+                $newEntry['issueGalleyId'] = $issueGalley->getId();
+                $newEntry['assocType'] = $assocType;
+                break;
+        }
     }
 }
 
