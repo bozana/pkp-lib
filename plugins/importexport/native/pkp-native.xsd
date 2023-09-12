@@ -256,6 +256,7 @@
 			<element name="licenseUrl" type="anyURI" minOccurs="0" maxOccurs="1" />
 			<element name="copyrightHolder" type="pkp:localizedNode" minOccurs="0" maxOccurs="unbounded" />
 			<element name="copyrightYear" type="int" minOccurs="0" maxOccurs="1" />
+			<element name="pkp:contextName" maxOccurs="unbounded" minOccurs="1" />
 			<element ref="pkp:keywords" minOccurs="0" maxOccurs="unbounded" />
 			<element ref="pkp:agencies" minOccurs="0" maxOccurs="unbounded" />
 			<element ref="pkp:languages" minOccurs="0" maxOccurs="unbounded" />
@@ -339,6 +340,14 @@
 	<element name="pkppublication" type="pkp:pkppublication" />
 
 	<!-- Controlled vocabularies -->
+	<element name="contextName">
+		<complexType>
+			<sequence>
+				<element name="contextName" type="string" minOccurs="1" maxOccurs="unbounded" />
+			</sequence>
+			<attribute name="locale" type="string" />
+		</complexType>
+	</element>
 	<element name="keywords">
 		<complexType>
 			<sequence>
