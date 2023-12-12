@@ -19,6 +19,8 @@ namespace PKP\sushi;
 
 use APP\core\Services;
 use APP\facades\Repo;
+use DateInterval;
+use DatePeriod;
 use DateTime;
 use PKP\context\Context;
 
@@ -172,11 +174,16 @@ abstract class CounterR5Report
         }
     }
 
-    /**
-     * Get report items
-     */
+    /** Get report items */
     abstract public function getReportItems(): array;
 
+    /** Get report items prepared for TSV report */
+    abstract public function getTSVReportItems(): array;
+
+    /** Get TSV report column names */
+    abstract public function getTSVColumnNames(): array;
+
+    /** Add a warning */
     protected function addWarning(array $exception): void
     {
         $this->warnings[] = $exception;
@@ -530,6 +537,72 @@ abstract class CounterR5Report
         }
 
         return $reportHeader;
+    }
+
+    /** Get report header for TSV reports */
+    public function getTSVReportHeader(): array
+    {
+        $institutionIds = [];
+        if (isset($this->institutionIds)) {
+            foreach ($this->institutionIds as $institutionId) {
+                if ($institutionId['Type'] == 'Proprietary') {
+                    $institutionIds[] = $institutionId['Value'];
+                } else {
+                    $institutionIds[] = $institutionId['Type'] . ':' . $institutionId['Value'];
+                }
+            }
+        }
+        $reportHeaderInstitutionId = !empty($institutionIds) ? implode(';', $institutionIds) : '';
+        $reportHeaderMetricTypes = $beginDate = $endDate = '';
+        $reportHeaderFilters = $reportHeaderAttributes = [];
+        foreach ($this->filters as $filter) {
+            switch ($filter['Name']) {
+                case ('Metric_Type'):
+                    $reportHeaderMetricTypes = implode(';', explode('|', $filter['Value']));
+                    break;
+                case ('Begin_Date'):
+                    $beginDate = $filter['Name'] . '=' . $filter['Value'];
+                    break;
+                case ('End_Date'):
+                    $endDate = $filter['Name'] . '=' . $filter['Value'];
+                    break;
+                default:
+                    $reportHeaderFilters[] = $filter['Name'] . '=' . $filter['Value'];
+            }
+        }
+        foreach ($this->attributes as $attribute) {
+            if ($attribute['Name'] == 'granularity') {
+                $excludeMonthlyDetails = $attribute['Value'] == 'Month' ? 'False' : 'True';
+                $reportHeaderAttributes[] = 'Exclude_Monthly_Details' . '=' . $excludeMonthlyDetails;
+            } else {
+                $reportHeaderAttributes[] = $attribute['Name'] . '=' . $attribute['Value'];
+            }
+        }
+        $reportHeader = [
+            ['Report_Name', $this->getName()],
+            ['Report_ID', $this->getID()],
+            ['Release', $this->getRelease()],
+            ['Institution_Name', $this->institutionName],
+            ['Institution_ID', $reportHeaderInstitutionId],
+            ['Metric_Types', $reportHeaderMetricTypes],
+            ['Report_Filters', implode(';', $reportHeaderFilters)],
+            ['Report_Attributes', implode(';', $reportHeaderAttributes)],
+            ['Exceptions', 'warnings'],
+            ['Reporting_Period', $beginDate . ';' . $endDate],
+            ['Created', date('Y-m-d\TH:i:s\Z', time())],
+            ['Created_By', $this->platformName],
+        ];
+        return $reportHeader;
+    }
+
+    /** Get monthly period */
+    protected function getMonthlyPeriod(): DatePeriod
+    {
+        // every month for the given period needs to be considered
+        $start = new DateTime($this->beginDate);
+        $end = new DateTime($this->endDate);
+        $interval = DateInterval::createFromDateString('1 month');
+        return new DatePeriod($start, $interval, $end);
     }
 
     /**

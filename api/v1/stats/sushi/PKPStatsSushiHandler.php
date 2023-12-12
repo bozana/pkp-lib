@@ -237,6 +237,8 @@ class PKPStatsSushiHandler extends APIHandler
      */
     protected function getReportResponse(CounterR5Report $report, SlimHttpRequest $slimRequest, APIResponse $response, array $args): APIResponse
     {
+        $responseTSV = str_contains($slimRequest->getHeaderLine('Accept'), APIResponse::RESPONSE_TSV) ? true : false;
+
         $params = $slimRequest->getQueryParams();
 
         try {
@@ -245,9 +247,17 @@ class PKPStatsSushiHandler extends APIHandler
             return $response->withJson($e->getResponseData(), $e->getHttpStatusCode());
         }
 
+        if ($responseTSV) {
+            $reportHeader = $report->getTSVReportHeader();
+            $reportColumnNames = $report->getTSVColumnNames();
+            $reportItems = $report->getTSVReportItems();
+            $report = array_merge($reportHeader, [['']], $reportColumnNames, $reportItems);
+            // TO-DO: consider error 3030: no usage available
+            return $response->withCSV($report, [], count($reportItems), APIResponse::RESPONSE_TSV);
+        }
+
         $reportHeader = $report->getReportHeader();
         $reportItems = $report->getReportItems();
-
         return $response->withJson([
             'Report_Header' => $reportHeader,
             'Report_Items' => $reportItems,
