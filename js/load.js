@@ -90,6 +90,7 @@ import FieldUploadImage from '@/components/Form/fields/FieldUploadImage.vue';
 
 // Panel components from UI Library
 import ListPanel from '@/components/ListPanel/ListPanel.vue';
+//import CounterReportsListPanel from '@/components/ListPanel/counter/CounterReportsListPanel';
 
 // Helper for initializing and tracking Vue controllers
 import VueRegistry from './classes/VueRegistry.js';
@@ -184,6 +185,7 @@ Vue.component('PkpFieldUploadImage', FieldUploadImage);
 
 // Register ListPanel
 Vue.component('PkpListPanel', ListPanel);
+//Vue.component('counter-list-panel', CounterReportsListPanel);
 
 export default {
 	Vue: Vue,

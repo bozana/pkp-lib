@@ -53,5 +53,11 @@ class PKPInstitutionForm extends FormComponent
                 'label' => __('manager.institutions.form.ror'),
                 'description' => __('manager.institutions.form.ror.description'),
             ]));
+        $this->addPage([
+            'id' => 'default',
+            'submitButton' => [
+                'label' => 'bla bla',
+            ],
+        ]);
     }
 }

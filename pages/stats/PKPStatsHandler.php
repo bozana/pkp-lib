@@ -22,6 +22,7 @@ use APP\core\Services;
 use APP\facades\Repo;
 use APP\handler\Handler;
 use APP\template\TemplateManager;
+use PKP\components\forms\context\PKPCounterR5TSVReportForm;
 use PKP\core\PKPApplication;
 use PKP\core\PKPRequest;
 use PKP\plugins\PluginRegistry;
@@ -42,7 +43,7 @@ class PKPStatsHandler extends Handler
         parent::__construct();
         $this->addRoleAssignment(
             [Role::ROLE_ID_SITE_ADMIN, Role::ROLE_ID_MANAGER, Role::ROLE_ID_SUB_EDITOR],
-            ['editorial', 'publications', 'context', 'users', 'reports']
+            ['editorial', 'publications', 'context', 'users', 'reports', 'counterR5']
         );
     }
 
@@ -431,6 +432,75 @@ class PKPStatsHandler extends Handler
         ]);
 
         $templateMgr->display('stats/context.tpl');
+    }
+
+    /*
+    public function counterR5(array $args, Request $request): void
+    {
+        $dispatcher = $request->getDispatcher();
+        $context = $request->getContext();
+
+        if (!$context) {
+            $dispatcher->handle404();
+        }
+
+        $locales = $context->getSupportedFormLocaleNames();
+        $locales = array_map(fn (string $locale, string $name) => ['key' => $locale, 'label' => $name], array_keys($locales), $locales);
+        $counterR5TSVReportApiUrl = $dispatcher->url($request, PKPApplication::ROUTE_API, $context->getPath(), 'stats/sushi/reports');
+        $counterR5TSVReportForm = new PKPCounterR5TSVReportForm($counterR5TSVReportApiUrl, $locales, $context);
+
+        $templateMgr = TemplateManager::getManager($request);
+        $this->setupTemplate($request);
+        $templateMgr->setState([
+            'components' => [
+                $counterR5TSVReportForm::FORM_COUNTER_R5_TSV_REPORT => $counterR5TSVReportForm->getConfig(),
+            ],
+        ]);
+        $templateMgr->assign([
+            'pageTitle' => __('manager.distribution.title'),
+        ]);
+        $templateMgr->display('stats/counterR5TSVReport.tpl');
+
+    }
+    */
+    /**
+     * Display list of institutions
+     */
+    public function counterR5(array $args, Request $request): void
+    {
+        $templateMgr = TemplateManager::getManager($request);
+        $this->setupTemplate($request);
+
+        $apiUrl = $request->getDispatcher()->url($request, PKPApplication::ROUTE_API, $request->getContext()->getPath(), 'stats/sushi');
+
+        $context = $request->getContext();
+        $locales = $context->getSupportedFormLocaleNames();
+        $locales = array_map(fn (string $locale, string $name) => ['key' => $locale, 'label' => $name], array_keys($locales), $locales);
+
+        $counterReportForm = new \PKP\components\forms\counter\PKPCounterReportForm($apiUrl, $locales);
+        $institutionForm = new \PKP\components\forms\institution\PKPInstitutionForm($apiUrl, $locales);
+
+        $counterReportsListPanel = new \PKP\components\listPanels\PKPCounterReportsListPanel(
+            'counterReportsListPanel',
+            __('manager.statistics.reports'),
+            [
+                'apiUrl' => $apiUrl,
+                'form' => $institutionForm,
+                'items' => [],
+                'itemsMax' => 0,
+            ]
+        );
+
+        $templateMgr->setState([
+            'components' => [
+                $counterReportsListPanel->id => $counterReportsListPanel->getConfig(),
+            ],
+        ]);
+        $templateMgr->assign([
+            'pageComponent' => 'CounterReportsPage',
+        ]);
+
+        $templateMgr->display('stats/counterReports.tpl');
     }
 
     /**

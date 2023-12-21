@@ -32,6 +32,12 @@ abstract class CounterR5Report
     /** Access type */
     public const ACCESS_TYPE = 'OA_Gold';
 
+    /** report's ID */
+    public string $id;
+
+    /** report's name */
+    public string $name;
+
     /** ID of the context the report is for. */
     public Context $context;
 
@@ -612,5 +618,49 @@ abstract class CounterR5Report
     {
         $d = DateTime::createFromFormat($format, $date);
         return $d && $d->format($format) === $date;
+    }
+
+    public function getFields(Context $context): array
+    {
+        return [
+            new FieldHTML('preamble', [
+                'label' => __('plugins.importexport.crossref.settings'),
+                'description' => $this->_getPreambleText($context),
+            ]),
+            new FieldText('depositorName', [
+                'label' => __('plugins.importexport.crossref.settings.form.depositorName'),
+                'description' => __('plugins.importexport.crossref.settings.form.depositorName.description'),
+                'isRequired' => true,
+                'value' => $this->agencyPlugin->getSetting($context->getId(), 'depositorName'),
+            ]),
+            new FieldText('depositorEmail', [
+                'label' => __('plugins.importexport.crossref.settings.form.depositorEmail'),
+                'description' => __('plugins.importexport.crossref.settings.form.depositorEmail.description'),
+                'isRequired' => true,
+                'value' => $this->agencyPlugin->getSetting($context->getId(), 'depositorEmail'),
+            ]),
+            new FieldHTML('credentialsExplanation', [
+                'description' => __('plugins.importexport.crossref.registrationIntro'),
+            ]),
+            new FieldText('username', [
+                'label' => __('plugins.importexport.crossref.settings.form.username'),
+                'description' => __('plugins.importexport.crossref.settings.form.username.description'),
+                'value' => $this->agencyPlugin->getSetting($context->getId(), 'username'),
+                'inputType' => 'text',
+            ]),
+            new FieldText('password', [
+                'label' => __('plugins.importexport.common.settings.form.password'),
+                'description' => __('plugins.importexport.common.settings.form.password.description'),
+                'value' => $this->agencyPlugin->getSetting($context->getId(), 'password'),
+                'inputType' => 'password',
+            ]),
+            new FieldOptions('testMode', [
+                'label' => __('plugins.importexport.common.settings.form.testMode.label'),
+                'options' => [
+                    ['value' => true, 'label' => __('plugins.importexport.crossref.settings.form.testMode.description')]
+                ],
+                'value' => (bool) $this->agencyPlugin->getSetting($context->getId(), 'testMode'),
+            ])
+        ];
     }
 }
