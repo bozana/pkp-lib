@@ -40,24 +40,23 @@ class PKPInstitutionForm extends FormComponent
         $this->action = $action;
         $this->locales = $locales;
 
+        $this->addPage(['id' => 'default', 'submitButton' => ['label' => __('common.export')]]);
+        $this->addGroup(['id' => 'default', 'pageId' => 'default']);
         $this->addField(new FieldText('name', [
             'label' => __('common.name'),
             'size' => 'large',
             'isMultilingual' => true,
+            'groupId' => 'default',
         ]))
             ->addField(new FieldTextarea('ipRanges', [
                 'label' => __('manager.institutions.form.ipRanges'),
                 'description' => __('manager.institutions.form.ipRangesInstructions'),
+                'groupId' => 'default',
             ]))
             ->addField(new FieldText('ror', [
                 'label' => __('manager.institutions.form.ror'),
                 'description' => __('manager.institutions.form.ror.description'),
+                'groupId' => 'default',
             ]));
-        $this->addPage([
-            'id' => 'default',
-            'submitButton' => [
-                'label' => 'bla bla',
-            ],
-        ]);
     }
 }

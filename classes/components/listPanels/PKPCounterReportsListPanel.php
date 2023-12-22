@@ -16,7 +16,6 @@
 namespace PKP\components\listPanels;
 
 use PKP\components\forms\counter\PKPCounterReportForm;
-use PKP\components\forms\institution\PKPInstitutionForm;
 
 class PKPCounterReportsListPanel extends ListPanel
 {
@@ -24,8 +23,7 @@ class PKPCounterReportsListPanel extends ListPanel
     public string $apiUrl = '';
 
     /** Form for adding or editing an institution */
-    //public ?PKPCounterReportForm $form = null;
-    public ?PKPInstitutionForm $form = null;
+    public ?PKPCounterReportForm $form = null;
 
     /**Query parameters to pass if this list executes GET requests  */
     public array $getParams = [];

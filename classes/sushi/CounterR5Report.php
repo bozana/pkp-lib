@@ -22,6 +22,9 @@ use APP\facades\Repo;
 use DateInterval;
 use DatePeriod;
 use DateTime;
+use PKP\components\forms\FieldOptions;
+use PKP\components\forms\FieldSelect;
+use PKP\components\forms\FieldText;
 use PKP\context\Context;
 
 abstract class CounterR5Report
@@ -620,47 +623,85 @@ abstract class CounterR5Report
         return $d && $d->format($format) === $date;
     }
 
-    public function getFields(Context $context): array
+    public static function getMetricTypes(): array
     {
         return [
-            new FieldHTML('preamble', [
-                'label' => __('plugins.importexport.crossref.settings'),
-                'description' => $this->_getPreambleText($context),
-            ]),
-            new FieldText('depositorName', [
-                'label' => __('plugins.importexport.crossref.settings.form.depositorName'),
-                'description' => __('plugins.importexport.crossref.settings.form.depositorName.description'),
+            'Total_Item_Investigations',
+            'Unique_Item_Investigations',
+            'Total_Item_Requests',
+            'Unique_Item_Requests'
+        ];
+    }
+
+    public static function getAttributesToShow(): array
+    {
+        return [];
+    }
+
+    public static function getCommonReportSettingsFormFields(Context $context): array
+    {
+        $institutions = Repo::institution()->getCollector()
+            ->filterByContextIds([$context->getId()])
+            ->getMany();
+
+        $institutionOptions = [['value' => '0', 'label' => 'The World']];
+        foreach ($institutions as $institution) {
+            $institutionOptions[] = ['value' => $institution->getId(), 'label' => $institution->getLocalizedName()];
+        }
+
+        $metricTypeOptions = [];
+        foreach (static::getMetricTypes() as $metricType) {
+            $metricTypeOptions[] = ['value' => $metricType, 'label' => $metricType];
+        }
+
+        $attributesToShowOptions = [];
+        foreach (static::getAttributesToShow() as $attributeToShow) {
+            $attributesToShowOptions[] = ['value' => $attributeToShow, 'label' => $attributeToShow];
+        }
+
+        return [
+            new FieldText('begin_date', [
+                'label' => __('common.date'),
+                'size' => 'small',
+                'isMultilingual' => false,
                 'isRequired' => true,
-                'value' => $this->agencyPlugin->getSetting($context->getId(), 'depositorName'),
+                'groupId' => 'default',
             ]),
-            new FieldText('depositorEmail', [
-                'label' => __('plugins.importexport.crossref.settings.form.depositorEmail'),
-                'description' => __('plugins.importexport.crossref.settings.form.depositorEmail.description'),
+            new FieldText('end_date', [
+                'label' => __('common.date'),
+                'size' => 'small',
+                'isMultilingual' => false,
                 'isRequired' => true,
-                'value' => $this->agencyPlugin->getSetting($context->getId(), 'depositorEmail'),
+                'groupId' => 'default',
             ]),
-            new FieldHTML('credentialsExplanation', [
-                'description' => __('plugins.importexport.crossref.registrationIntro'),
+            new FieldSelect('customer_id', [
+                'label' => 'Customer ID',
+                'options' => $institutionOptions,
+                'value' => '0',
+                'isRequired' => true,
+                'groupId' => 'default',
             ]),
-            new FieldText('username', [
-                'label' => __('plugins.importexport.crossref.settings.form.username'),
-                'description' => __('plugins.importexport.crossref.settings.form.username.description'),
-                'value' => $this->agencyPlugin->getSetting($context->getId(), 'username'),
-                'inputType' => 'text',
+            new FieldOptions('metric_type', [
+                'label' => 'Metric Type',
+                'options' => $metricTypeOptions,
+                'groupId' => 'default',
             ]),
-            new FieldText('password', [
-                'label' => __('plugins.importexport.common.settings.form.password'),
-                'description' => __('plugins.importexport.common.settings.form.password.description'),
-                'value' => $this->agencyPlugin->getSetting($context->getId(), 'password'),
-                'inputType' => 'password',
+
+            new FieldOptions('attributes_to_show', [
+                'label' => 'Attributes To Show',
+                'options' => $attributesToShowOptions,
+                'groupId' => 'default',
             ]),
-            new FieldOptions('testMode', [
-                'label' => __('plugins.importexport.common.settings.form.testMode.label'),
+
+            new FieldOptions('granularity', [
+                'label' => 'Exclude Monthly Details',
                 'options' => [
-                    ['value' => true, 'label' => __('plugins.importexport.crossref.settings.form.testMode.description')]
+                    ['value' => true, 'label' => 'Exclude Monthly Details'],
                 ],
-                'value' => (bool) $this->agencyPlugin->getSetting($context->getId(), 'testMode'),
-            ])
+                'value' => false,
+                'groupId' => 'default',
+            ]),
+
         ];
     }
 }

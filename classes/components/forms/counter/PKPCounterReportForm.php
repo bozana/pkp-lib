@@ -15,6 +15,8 @@
 
 namespace PKP\components\forms\counter;
 
+use APP\core\Application;
+use APP\sushi\PR;
 use PKP\components\forms\FieldText;
 use PKP\components\forms\FormComponent;
 
@@ -28,6 +30,8 @@ class PKPCounterReportForm extends FormComponent
     /** @copydoc FormComponent::$method */
     public $method = 'GET';
 
+    public $reportId = '';
+
     /**
      * Constructor
      *
@@ -39,21 +43,31 @@ class PKPCounterReportForm extends FormComponent
         $this->action = $action;
         $this->locales = $locales;
 
+        $context = Application::get()->getRequest()->getContext();
+        $formFields = PR::getReportSettingsFormFields($context);
+        $this->addPage(['id' => 'default', 'submitButton' => ['label' => __('common.download')]]);
+        $this->addGroup(['id' => 'default', 'pageId' => 'default']);
+        foreach ($formFields as $formField) {
+            $this->addField($formField);
+        }
+        $file = 'debug.txt';
+        $current = file_get_contents($file);
+        $current .= print_r("++++ formFields ++++\n", true);
+        $current .= print_r($this->fields, true);
+        file_put_contents($file, $current);
+        /*
         $this->addField(new FieldText('begin_date', [
             'label' => __('common.date'),
             'size' => 'small',
             'isMultilingual' => false,
+            'groupId' => 'default',
         ]));
         $this->addField(new FieldText('end_date', [
             'label' => __('common.date'),
             'size' => 'small',
             'isMultilingual' => false,
+            'groupId' => 'default',
         ]));
-        $this->addPage([
-            'id' => 'default',
-            'submitButton' => [
-                'label' => 'Download',
-            ],
-        ]);
+        */
     }
 }
