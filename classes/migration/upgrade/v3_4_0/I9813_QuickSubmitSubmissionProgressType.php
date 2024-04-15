@@ -15,13 +15,23 @@
 
 namespace PKP\migration\upgrade\v3_4_0;
 
+use Exception;
 use Illuminate\Support\Facades\DB;
+use PKP\db\DAORegistry;
 use PKP\install\DowngradeNotSupportedException;
 
 class I9813_QuickSubmitSubmissionProgressType extends \PKP\migration\Migration
 {
     public function up(): void
     {
+        $thresholdVersion = '1.0.7.1';
+        /** @var VersionDAO $versionDao */
+        $versionDao = DAORegistry::getDAO('VersionDAO');
+        $installedQuickSubmitPluginVersion = $versionDao->getCurrentVersion('plugins.importexport', 'quickSubmit');
+        if ($installedQuickSubmitPluginVersion->compare($thresholdVersion) === 0) {
+            throw new Exception('You have the QuickSubmit version 1.0.7.1. Please upgrade the QuickSubmit plugin first, bofore running this upgrade.');
+        }
+
         foreach ($this->getStepMap() as $oldValue => $newValue) {
             DB::table('submissions')
                 ->where('submission_progress', $oldValue)
