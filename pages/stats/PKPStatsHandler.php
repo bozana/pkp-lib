@@ -466,7 +466,7 @@ class PKPStatsHandler extends Handler
             ],
         ]);
         $templateMgr->assign([
-            'pageComponent' => 'CounterReportsPage',
+            'pageComponent' => 'Page',
             'usagePossible' => $lastDate > $earliestDate,
         ]);
         $templateMgr->display('stats/counterReports.tpl');
