@@ -1,0 +1,796 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2019-11-19T10:49:50+00:00\n"
+"PO-Revision-Date: 2021-01-06 13:52+0000\n"
+"Last-Translator: Kazimir Hrastek <kazimir3385@gmail.com>\n"
+"Language-Team: Bosnian <http://translate.pkp.sfu.ca/projects/pkp-lib/admin/"
+"bs_BA/>\n"
+"Language: bs_BA\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n%10==1 && n%100!=11 ? 0 : n%10>=2 && n"
+"%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2;\n"
+"X-Generator: Weblate 3.9.1\n"
+
+msgid "admin.systemInfo.settingName"
+msgstr "Naziv postavke"
+
+msgid "admin.systemInfo.settingValue"
+msgstr "Vrijednost postavke"
+
+msgid "admin.adminFunctions"
+msgstr "Administrativne funkcije"
+
+msgid "admin.deleteCache"
+msgstr ""
+
+msgid "admin.deleteCache.description"
+msgstr ""
+
+msgid "admin.clearDataCache"
+msgstr "Očisti predmemoriju podataka"
+
+msgid "admin.clearTemplateCache"
+msgstr "Očisti predmemoriju predložka"
+
+msgid "admin.configFileUpdatedInstructions"
+msgstr ""
+"Vaša konfiguracijska datoteka je uspješno ažurirana. Imajte na umu da "
+"ukoliko vaša stranica više ne radi ispravno, tada ćete morati ručno podesiti "
+"svoju konfiguraciju prilikom direktnog uređivanja <tt>config.inc.php</tt> "
+"datoteke."
+
+msgid "admin.confirmClearTemplateCache"
+msgstr ""
+"Jeste li sigurni da želite očistiti predmemoriju kompajliranih predložaka?"
+
+msgid "admin.confirmExpireSessions"
+msgstr ""
+"Jeste li sigurni da želite da sesije svih korisnika isteknu? Svi korisnici "
+"koji su trenutno prijavljeni u sistem bit će prisiljeni da se ponovo prijave "
+"(Vi također)."
+
+msgid "admin.contentsOfConfigFile"
+msgstr "Sadržaj konfiguracijske datoteke"
+
+msgid "admin.contexts.confirmDelete"
+msgstr ""
+"Jeste li sigurni da želite trajno izbrisati {$contextName} i sav njegov "
+"sadržaj?"
+
+msgid "admin.currentVersion"
+msgstr "Trenutna verzija"
+
+msgid "admin.dateInstalled"
+msgstr "Datum instalacije"
+
+msgid "admin.displayConfigFileInstructions"
+msgstr ""
+"Sadržaj vaše ažurirane konfiguracije prikazan je u nastavku. Da biste "
+"primijenili promjene konfiguracije, morate otvoriti <tt>config.inc.php</tt> "
+"u odgovarajućem uređivaču teksta i zamijeniti njegov sadržaj sadržajem "
+"donjeg tekstualnog polja."
+
+msgid "admin.displayNewSystemConfig"
+msgstr "Prikaži novu konfiguraciju"
+
+msgid "admin.expireSessions"
+msgstr "Istek korisničkih sesija"
+
+msgid "admin.expireSessions.description"
+msgstr ""
+
+msgid "admin.languages.cantDisable"
+msgstr ""
+"Ovaj je jezik primarni jezik web stranice. Ne možete ga onemogućiti dok ne "
+"odaberete drugu primarnu lokalizaciju."
+
+msgid "admin.languages.confirmSitePrimaryLocaleChange"
+msgstr ""
+"Jeste li sigurni da želite promijeniti primarni jezik stranice? Imena "
+"korisnika, koja su potrebna u primarnoj lokalizaciji web stranice, kopirat "
+"će se iz postojeće primarne lokalizacije tamo gdje nedostaju."
+
+msgid "admin.languages.confirmReload"
+msgstr ""
+"Jeste li sigurni da želite ponovo učitati ovu lokalizaciju? Ovo će izbrisati "
+"sve postojeće podatke specifične za lokalni jezik, poput prilagođenih e-mail "
+"predložaka."
+
+msgid "admin.languages.installedLocales"
+msgstr "Instalirani prevodi"
+
+msgid "admin.languages.installLanguages"
+msgstr "Upravljanje lokalizacijama"
+
+msgid "admin.languages.availableLocales"
+msgstr "Dostupne lokalizacije"
+
+msgid "admin.languages.installLocale"
+msgstr "Instaliraj lokalizaciju"
+
+msgid "admin.languages.installLocales"
+msgstr "Instaliraj"
+
+msgid "admin.languages.installNewLocales"
+msgstr "Instaliraj nove lokalizacije"
+
+msgid "admin.languages.languageSettings"
+msgstr "Postavke jezika"
+
+msgid "admin.languages.noLocalesAvailable"
+msgstr "Nema dodatnih lokalizacija na raspolaganju za instalaciju."
+
+msgid "admin.languages.reload"
+msgstr "Ponovo učitaj lokalizaciju"
+
+msgid "admin.languages.uninstall"
+msgstr "Deinstalacija lokalizacije"
+
+msgid "admin.phpInfo"
+msgstr "Proširene PHP informacije"
+
+msgid "admin.scheduledTask"
+msgstr "Planirani zadatak"
+
+msgid "admin.scheduledTask.startTime"
+msgstr "Proces zadatka je započet."
+
+msgid "admin.scheduledTask.stopTime"
+msgstr "Proces zadatka je zaustavljen."
+
+msgid "admin.scheduledTask.noLog"
+msgstr "Zadatak nije proizveo log zapis."
+
+msgid "admin.scheduledTask.depositDois"
+msgstr ""
+
+msgid "admin.scheduledTask.downloadLog"
+msgstr ""
+"Vaša instalacija {$softwareName} je automatski izvršila i dovršila ovaj "
+"zadatak, a datoteku dnevnika možete preuzeti ovdje: {$url}"
+
+msgid "admin.scheduledTask.editorialReminder"
+msgstr ""
+
+msgid "admin.scheduledTask.editorialReminder.logStart"
+msgstr ""
+
+msgid "admin.scheduledTask.editorialReminder.logEnd"
+msgstr ""
+
+msgid "admin.scheduledTask.confirmClearLogs"
+msgstr ""
+"Jeste li sigurni da želite izbrisati sve zapisnike izvršenja planiranih "
+"zadataka?"
+
+msgid "admin.scheduledTask.clearLogs"
+msgstr "Očistite dnevnike izvršenja planiranih zadataka"
+
+msgid "admin.scheduledTask.clearLogs.description"
+msgstr ""
+
+msgid "admin.scheduledTask.clearLogs.delete"
+msgstr ""
+
+msgid "admin.scheduledTask.publishSubmissions"
+msgstr "Objavite predaje rada predviđene za objavljivanje"
+
+msgid "admin.scheduledTask.reviewReminder"
+msgstr "Podsjetnik za pregled"
+
+msgid "admin.scheduledTask.statisticsReport"
+msgstr ""
+
+msgid "admin.scheduledTask.subscriptionExpiryReminder"
+msgstr "Podsjetnik za istek pretplate"
+
+msgid "admin.scheduledTask.removeUnvalidatedExpiredUsers"
+msgstr ""
+
+msgid "admin.scheduledTask.removeFailedJobs"
+msgstr ""
+
+msgid "admin.scheduledTask.processQueueJobs"
+msgstr ""
+
+msgid "admin.scheduledTask.updateGeoDB"
+msgstr ""
+
+msgid "admin.scheduledTask.updateGeoDB.fileRename.error"
+msgstr ""
+
+msgid "admin.scheduledTask.usageStatsLoader"
+msgstr ""
+
+msgid "admin.scheduledTask.usageStatsLoader.processingPathNotEmpty"
+msgstr ""
+
+msgid "admin.job.processLogFile.openFileFailed"
+msgstr ""
+
+msgid "admin.scheduledTask.usageStatsLoader.veryOldLogFile"
+msgstr ""
+
+msgid "admin.scheduledTask.usageStatsLoader.monthExists"
+msgstr ""
+
+msgid "admin.job.processLogFile.wrongLoglineFormat"
+msgstr ""
+
+msgid "admin.job.processLogFile.invalidLogEntry"
+msgstr ""
+
+msgid "admin.job.processLogFile.invalidLogEntry.time"
+msgstr ""
+
+msgid "admin.job.processLogFile.invalidLogEntry.contextId"
+msgstr ""
+
+msgid "admin.job.processLogFile.invalidLogEntry.submissionId"
+msgstr ""
+
+msgid "admin.job.processLogFile.invalidLogEntry.representationId"
+msgstr ""
+
+msgid "admin.job.processLogFile.invalidLogEntry.assocType"
+msgstr ""
+
+msgid "admin.job.processLogFile.invalidLogEntry.fileType"
+msgstr ""
+
+msgid "admin.job.processLogFile.invalidLogEntry.country"
+msgstr ""
+
+msgid "admin.job.processLogFile.invalidLogEntry.region"
+msgstr ""
+
+msgid "admin.job.processLogFile.invalidLogEntry.institutionIds"
+msgstr ""
+
+msgid "admin.job.processLogFile.insertError"
+msgstr ""
+
+msgid "admin.scheduledTask.usageStatsLoader.jobDispatched"
+msgstr ""
+
+msgid "admin.server.apacheVersion"
+msgstr "Verzija Apache-a"
+
+msgid "admin.server.dbDriver"
+msgstr "Tip baze podataka"
+
+msgid "admin.server.dbVersion"
+msgstr "Verzija servera baze podataka"
+
+msgid "admin.serverInformation"
+msgstr "Informacije o serveru"
+
+msgid "admin.server.phpVersion"
+msgstr "Verzija PHP-a"
+
+msgid "admin.server.platform"
+msgstr "Platforma OS-a"
+
+msgid "admin.settings"
+msgstr "Postavke"
+
+msgid "admin.settings.about"
+msgstr "Opis stranice"
+
+msgid "admin.settings.enableBulkEmails.label"
+msgstr ""
+
+msgid "admin.settings.contactEmail"
+msgstr "E-mail glavnog kontakta"
+
+msgid "admin.settings.contactName"
+msgstr "Ime glavnog kontakta"
+
+msgid "admin.settings.introduction"
+msgstr "Uvod"
+
+msgid "admin.settings.minPasswordLength"
+msgstr "Minimalna dužina šifre (znakova)"
+
+msgid "admin.settings.restrictBulkEmails"
+msgstr ""
+
+msgid "admin.settings.disableBulkEmailRoles.label"
+msgstr ""
+
+msgid "admin.settings.disableBulkEmailRoles.adminOnly"
+msgstr ""
+
+msgid "admin.settings.siteLanguage"
+msgstr "Jezik stranice"
+
+msgid "admin.settings.siteStyleSheetInvalid"
+msgstr "Neispravan style sheet format. Sistem prihvata samo .css format."
+
+msgid "admin.settings.siteStyleSheet"
+msgstr "Style sheet (CSS) stranice"
+
+msgid "admin.settings.siteLogo"
+msgstr "Logo stranice"
+
+msgid "admin.settings.siteTitle"
+msgstr "Naziv stranice"
+
+msgid "admin.settings.siteTheme"
+msgstr "Tema stranice"
+
+msgid "admin.siteAdmin"
+msgstr "Administracija stranice"
+
+msgid "admin.siteManagement"
+msgstr "Upravljanje stranicom"
+
+msgid "admin.siteSettings"
+msgstr "Postavke stranice"
+
+msgid "admin.siteSetup"
+msgstr "Postavljanje stranice"
+
+msgid "admin.systemConfigFileReadError"
+msgstr ""
+"Konfiguracijska datoteka <tt>config.inc.php</tt> ne postoji, nije čitljiva "
+"ili je neispravna."
+
+msgid "admin.systemInformation"
+msgstr "Informacije o sistemu"
+
+msgid "admin.systemInformation.description"
+msgstr ""
+
+msgid "admin.systemInformation.view"
+msgstr ""
+
+msgid "admin.versionBuild"
+msgstr "Izgradi"
+
+msgid "admin.version.checkForUpdates"
+msgstr "Provjerite postoje li nove verzije"
+
+msgid "admin.version.downloadPackage"
+msgstr "Preuzmite"
+
+msgid "admin.version.downloadPatch"
+msgstr "Preuzmite zakrpu"
+
+msgid "admin.versionHistory"
+msgstr "Prijašnje verzije"
+
+msgid "admin.version.latest"
+msgstr "Zadnja verzija"
+
+msgid "admin.versionMajor"
+msgstr "Glavna"
+
+msgid "admin.versionMinor"
+msgstr "Sporedna"
+
+msgid "admin.version.moreInfo"
+msgstr "Više informacija"
+
+msgid "admin.versionRevision"
+msgstr "Revizija"
+
+msgid "admin.version.updateAvailable"
+msgstr "Ažurirana verzija je dostupna"
+
+msgid "admin.version.upToDate"
+msgstr "Vaš sustav je ažuran"
+
+msgid "admin.version"
+msgstr "Verzija"
+
+msgid "admin.fileLoader.wrongBasePathLocation"
+msgstr "Osnovna putanja {$path} mora biti unutar direktorija javnih datoteka."
+
+msgid "admin.fileLoader.pathNotAccessible"
+msgstr "Folder {$path} nije direktorij ili nije čitljiv."
+
+msgid "admin.fileLoader.moveFileFailed"
+msgstr ""
+"Datoteka {$filename} se ne može premjestiti iz {$currentFilePath} u "
+"{$destinationPath}"
+
+msgid "admin.fileLoader.fileProcessed"
+msgstr "Datoteka {$filename} je obrađena i arhivirana."
+
+msgid "admin.fileLoader.emailSubject"
+msgstr "Učitavač datoteka"
+
+msgid "admin.error.gzDecompressFile.gzopen"
+msgstr ""
+
+msgid "admin.error.gzDecompressFile.fopen"
+msgstr ""
+
+msgid "admin.error.gzDecompressFile.gzread"
+msgstr ""
+
+msgid "admin.error.gzDecompressFile.fwrite"
+msgstr ""
+
+msgid "admin.error.gzDecompressFile.fclose"
+msgstr ""
+
+msgid "admin.error.gzDecompressFile.gzclose"
+msgstr ""
+
+msgid "admin.error.gzDecompressFile.unlink"
+msgstr ""
+
+msgid "admin.error.gzCompressFile.gzopen"
+msgstr ""
+
+msgid "admin.error.gzCompressFile.fopen"
+msgstr ""
+
+msgid "admin.error.gzCompressFile.fread"
+msgstr ""
+
+msgid "admin.error.gzCompressFile.gzwrite"
+msgstr ""
+
+msgid "admin.error.gzCompressFile.fclose"
+msgstr ""
+
+msgid "admin.error.gzCompressFile.gzclose"
+msgstr ""
+
+msgid "admin.error.gzCompressFile.unlink"
+msgstr ""
+
+msgid "admin.languages.noLocalesToDownload"
+msgstr "Nema dostupnih lokalizacija za preuzimanje."
+
+msgid "admin.cli.tool.usage.title"
+msgstr ""
+
+msgid "admin.cli.tool.usage.parameters"
+msgstr ""
+
+msgid "admin.cli.tool.available.commands"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.maintenance.message"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.available.options.list.description"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.available.options.purge.description"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.available.options.test.description"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.available.options.work.description"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.available.options.failed.description"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.available.options.run.description"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.available.options.run.completed.description"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.available.options.run.empty.description"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.available.options.total.description"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.available.options.help.description"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.available.options.usage.description"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.empty.option"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.queued.jobs.failed.title"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.queued.jobs.title"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.queued.jobs.fields.id"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.queued.jobs.fields.queue"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.queued.jobs.fields.connection"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.queued.jobs.fields.job.display.name"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.queued.jobs.fields.attempts"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.queued.jobs.fields.reserved.at"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.queued.jobs.fields.available.at"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.queued.jobs.fields.created.at"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.queued.jobs.fields.failed.at"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.queued.jobs.fields.exception"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.pagination"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.pagination.current"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.pagination.previous"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.pagination.next"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.purge.without.id"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.test.job.failed.dispatch.message"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.test.job.success.dispatch.message"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.test.invalid.option"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.purge.invalid.id"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.purge.successful"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.purge.impossible.to.purge.empty"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.purge.impossible.to.purge.all"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.purge.successful.all"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.failed.clear.successful"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.failed.redispatch.successful"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.total.failed.jobs"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.total.jobs"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.option.doesnt.exists"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.mean.those"
+msgstr ""
+
+msgid "admin.jobs.totalCount"
+msgstr ""
+
+msgid "admin.jobs.failed.totalCount"
+msgstr ""
+
+msgid "admin.jobs.viewQueuedJobs"
+msgstr ""
+
+msgid "navigation.tools.jobs"
+msgstr ""
+
+msgid "navigation.tools.jobs.failed"
+msgstr ""
+
+msgid "navigation.tools.jobs.failed.details"
+msgstr ""
+
+msgid "navigation.tools.jobs.description"
+msgstr ""
+
+msgid "navigation.tools.jobs.view"
+msgstr ""
+
+msgid "navigation.tools.jobs.failed.view"
+msgstr ""
+
+msgid "navigation.tools.job.failed.details.view"
+msgstr ""
+
+msgid "admin.job.failed.list.attribute"
+msgstr ""
+
+msgid "admin.job.failed.list.attribute.value"
+msgstr ""
+
+msgid "admin.jobs.list.id"
+msgstr ""
+
+msgid "admin.jobs.list.displayName"
+msgstr ""
+
+msgid "admin.jobs.list.queue"
+msgstr ""
+
+msgid "admin.jobs.list.connection"
+msgstr ""
+
+msgid "admin.jobs.list.attempts"
+msgstr ""
+
+msgid "admin.jobs.list.createdAt"
+msgstr ""
+
+msgid "admin.jobs.list.failedAt"
+msgstr ""
+
+msgid "admin.jobs.list.payload"
+msgstr ""
+
+msgid "admin.jobs.list.exception"
+msgstr ""
+
+msgid "admin.jobs.list.actions"
+msgstr ""
+
+msgid "admin.jobs.failedAt"
+msgstr ""
+
+msgid "admin.jobs.createdAt"
+msgstr ""
+
+msgid "admin.jobs.failed.action.redispatch"
+msgstr ""
+
+msgid "admin.jobs.failed.action.redispatch.all"
+msgstr ""
+
+msgid "admin.job.compileMetrics.returnToStaging.error"
+msgstr ""
+
+msgid "admin.job.compileMetrics.error"
+msgstr ""
+
+msgid "admin.settings.statistics.collection"
+msgstr ""
+
+msgid "admin.settings.statistics.collection.description"
+msgstr ""
+
+msgid "admin.settings.statistics.storage"
+msgstr ""
+
+msgid "admin.settings.statistics.storage.description"
+msgstr ""
+
+msgid "admin.settings.statistics.sushi"
+msgstr ""
+
+msgid "admin.settings.statistics.sushi.description"
+msgstr ""
+
+msgid "admin.settings.statistics.keepDaily"
+msgstr ""
+
+msgid "admin.settings.statistics.keepDaily.description"
+msgstr ""
+
+msgid "admin.settings.statistics.keepDaily.keep"
+msgstr ""
+
+msgid "admin.settings.statistics.keepDaily.discard"
+msgstr ""
+
+msgid "admin.settings.statistics.compressStatsLogs.label"
+msgstr ""
+
+msgid "admin.settings.statistics.compressStatsLogs.description"
+msgstr ""
+
+msgid "admin.settings.statistics.compressStatsLogs.default"
+msgstr ""
+
+msgid "admin.settings.statistics.compressStatsLogs.compress"
+msgstr ""
+
+msgid "admin.settings.statistics.publicSushiApi.private"
+msgstr ""
+
+msgid "admin.settings.statistics.sushiPlatform"
+msgstr ""
+
+msgid "admin.settings.statistics.sushiPlatform.description"
+msgstr ""
+
+msgid "admin.settings.statistics.sushiPlatform.sushiPlatformID"
+msgstr ""
+
+msgid "admin.settings.statistics.sushiPlatform.sushiPlatformID.description"
+msgstr ""
+
+msgid "admin.settings.statistics.sushiPlatform.sushiPlatformID.required"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.work.options.title"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.work.options.usage"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.work.options.description"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.work.option.connection.description"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.work.option.queue.description"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.work.option.name.description"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.work.option.backoff.description"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.work.option.memory.description"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.work.option.timeout.description"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.work.option.sleep.description"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.work.option.tries.description"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.work.option.force.description"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.work.option.stopWhenEmpty.description"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.work.option.maxJobs.description"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.work.option.maxTime.description"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.work.option.rest.description"
+msgstr ""
+
+msgid "admin.cli.tool.jobs.work.option.test.description"
+msgstr ""
+
+#~ msgid "admin.serverInformationDescription"
+#~ msgstr ""
+#~ "Osnovni operacijski sustav i verzije programske opreme poslužitelja. "
+#~ "Kliknite na \"proširena  PHP informacija\" kako biste vidjeli dodatne "
+#~ "detalje PHP konfiguracije ovoga poslužitelja."
+
+#~ msgid "admin.settings.passwordCharacters"
+#~ msgstr "znakova"
