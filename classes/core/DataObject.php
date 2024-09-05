@@ -51,19 +51,6 @@ class DataObject
     /** @var mixed Whether injection adapters have already been loaded from the database */
     public mixed $_injectionAdaptersLoaded = false;
 
-    /** @var Conversion table for locales */
-    public array $_localesTable = [
-        'be@cyrillic' => 'be',
-        'bs' => 'bs_Latn',
-        'fr_FR' => 'fr',
-        'nb' => 'nb_NO',
-        'sr@cyrillic' => 'sr_Cyrl',
-        'sr@latin' => 'sr_Latn',
-        'uz@cyrillic' => 'uz',
-        'uz@latin' => 'uz_Latn',
-        'zh_CN' => 'zh_Hans',
-    ];
-
     /**
      * Constructor
      */
@@ -117,7 +104,6 @@ class DataObject
         return array_unique(
             array_filter([
                 $preferredLocale ?? Locale::getLocale(),
-                $this->_localesTable[$preferredLocale ?? Locale::getLocale()] ?? null,
                 $this->getDefaultLocale(),
                 $request->getContext()?->getPrimaryLocale(),
                 $request->getSite()->getPrimaryLocale(),
@@ -155,7 +141,7 @@ class DataObject
      * @param mixed $value can be either a single value or
      *  an array of of localized values in the form:
      *   array(
-     *     'fr_FR' => 'en français',
+     *     'fr' => 'en français',
      *     'en' => 'in English',
      *     ...
      *   )
