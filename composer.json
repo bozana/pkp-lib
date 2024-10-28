@@ -33,7 +33,7 @@
 		"psy/psysh": "@stable",
 		"friendsofphp/php-cs-fixer": "^3.8",
 		"mockery/mockery": "^1.6",
-		"captainhook/captainhook": "^5.10",
+		"captainhook/captainhook": "^5.22",
 		"captainhook/plugin-composer": "^5.3"
 	},
 	"config": {
