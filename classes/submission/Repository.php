@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file classes/submission/Repository.php
  *
@@ -25,6 +26,7 @@ use APP\submission\Submission;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Enumerable;
 use Illuminate\Support\LazyCollection;
+use PKP\config\Config;
 use PKP\context\Context;
 use PKP\core\Core;
 use PKP\db\DAORegistry;
@@ -41,7 +43,6 @@ use PKP\submission\reviewAssignment\Collector as ReviewCollector;
 use PKP\submissionFile\SubmissionFile;
 use PKP\user\User;
 use PKP\validation\ValidatorFactory;
-use PKP\config\Config;
 use PKP\userGroup\UserGroup;
 
 abstract class Repository
@@ -271,6 +272,9 @@ abstract class Repository
     public function validate(?Submission $submission, array $props, Context $context): array
     {
         $primaryLocale = $props['locale'] ?? $submission?->getData('locale') ?? $context->getSupportedDefaultSubmissionLocale();
+        // currently there are no multilingual submission settings,
+        // all metadata are in the publication object
+        // so consider now only submisison locales here
         $allowedLocales = $context->getSupportedSubmissionLocales();
 
         if (!in_array($primaryLocale, $allowedLocales)) {
@@ -752,7 +756,7 @@ abstract class Repository
      */
     public function getUrlAuthorWorkflow(Context $context, int $submissionId): string
     {
-        if(Config::getVar('features', 'enable_new_submission_listing')) {
+        if (Config::getVar('features', 'enable_new_submission_listing')) {
             return Application::get()->getDispatcher()->url(
                 Application::get()->getRequest(),
                 Application::ROUTE_PAGE,
@@ -821,7 +825,7 @@ abstract class Repository
         foreach ($roles as $role) {
             $roleIds[] = $role->getRoleId();
         }
-        if($selectedRoleIds) {
+        if ($selectedRoleIds) {
             $roleIds = array_values(array_intersect($roleIds, $selectedRoleIds));
         }
 
@@ -830,7 +834,7 @@ abstract class Repository
         $views = $this->mapDashboardViews($types, $context, $user, $canAccessUnassignedSubmission);
         $filteredViews = $this->filterViewsByUserRoles($views, $roleIds);
 
-        if($includeCount) {
+        if ($includeCount) {
             return $this->setViewsCount($filteredViews);
         }
 

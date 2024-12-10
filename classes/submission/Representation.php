@@ -18,11 +18,12 @@ namespace PKP\submission;
 
 use APP\core\Application;
 use APP\facades\Repo;
+use PKP\facades\Locale;
 
 /**
  * @extends \PKP\core\DataObject<DAO|RepresentationDAOInterface>
  */
-class Representation extends \PKP\core\DataObject
+abstract class Representation extends \PKP\core\DataObject
 {
     /**
      * Constructor.
@@ -33,6 +34,27 @@ class Representation extends \PKP\core\DataObject
         $this->setHasLoadableAdapters(true);
 
         parent::__construct();
+    }
+
+    /**
+     * Get this object's multilingual properties
+     */
+    abstract protected function getMultilingualProps(): array;
+
+    /**
+     * Get locale.
+     */
+    public function getLocale(): string
+    {
+        return $this->getData('locale');
+    }
+
+    /**
+     * Set locale.
+     */
+    public function setLocale(string $locale)
+    {
+        $this->setData('locale', $locale);
     }
 
     /**
@@ -176,6 +198,35 @@ class Representation extends \PKP\core\DataObject
     {
         return Application::getRepresentationDAO();
     }
+
+    /**
+     * Get metadata language names
+     */
+    public function getLanguageNames(): array
+    {
+        return Locale::getSubmissionLocaleDisplayNames($this->getLanguages());
+    }
+
+    /**
+     * Get metadata languages
+     */
+    public function getLanguages(): array
+    {
+        //$props = app()->get('schema')->getMultilingualProps(PKPSchemaService::SCHEMA_GALLEY);
+        $props = $this->getMultilingualProps();
+        $locales = [];
+        if (!empty($props)) {
+            $locales = array_map(fn (string $prop): array => array_keys($this->getData($prop) ?? []), $props);
+        }
+        return collect([$this->getData('locale')])
+            ->concat($locales)
+            ->flatten()
+            ->filter()
+            ->unique()
+            ->values()
+            ->toArray();
+    }
+
 }
 
 if (!PKP_STRICT_MODE) {
