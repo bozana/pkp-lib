@@ -183,18 +183,17 @@ class UserForm extends Form
             // ignore reviewer role
             $reviewerUserGroupIds = Repo::userGroup()->getArrayIdByRoleId(Role::ROLE_ID_REVIEWER, $contextId);
             collect($userGroupIds)
-                ->filter(
-                    function ($userGroupId) use ($reviewerUserGroupIds) {
-                        return !in_array($userGroupId, $reviewerUserGroupIds);
-                    }
-                )
                 ->each(
-                    function ($userGroupId) use ($mastheadUserGroupIds) {
-                        $masthead = match (in_array($userGroupId, $mastheadUserGroupIds)) {
-                            true => UserUserGroupMastheadStatus::STATUS_ON,
-                            false => UserUserGroupMastheadStatus::STATUS_OFF
-                        };
-                        Repo::userGroup()->updateUserUserGroupMastheadStatus($this->userId, $userGroupId, $masthead);
+                    function ($userGroupId) use ($mastheadUserGroupIds, $reviewerUserGroupIds) {
+                        if (in_array($userGroupId, $reviewerUserGroupIds)) {
+                            Repo::userGroup()->updateUserUserGroupMastheadStatus($this->userId, $userGroupId, UserUserGroupMastheadStatus::STATUS_ON);
+                        } else {
+                            $masthead = match (in_array($userGroupId, $mastheadUserGroupIds)) {
+                                true => UserUserGroupMastheadStatus::STATUS_ON,
+                                false => UserUserGroupMastheadStatus::STATUS_OFF
+                            };
+                            Repo::userGroup()->updateUserUserGroupMastheadStatus($this->userId, $userGroupId, $masthead);
+                        }
                     }
                 );
         }
