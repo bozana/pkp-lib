@@ -28,6 +28,7 @@ use PKP\plugins\Hook;
 use PKP\security\Role;
 use PKP\services\PKPSchemaService;
 use PKP\site\SiteDAO;
+use PKP\user\enums\UserMastheadStatus;
 use PKP\userGroup\relationships\enums\UserUserGroupMastheadStatus;
 use PKP\userGroup\relationships\enums\UserUserGroupStatus;
 use PKP\userGroup\relationships\UserGroupStage;
@@ -259,39 +260,14 @@ class Repository
      */
     public function updateUserUserGroupMastheadStatus(int $userId, int $userGroupId, UserUserGroupMastheadStatus $mastheadStatus): void
     {
-        $masthead = match ($mastheadStatus) {
-            UserUserGroupMastheadStatus::STATUS_ON => 1,
-            UserUserGroupMastheadStatus::STATUS_OFF => 0,
-            default => null
-        };
         UserUserGroup::query()
             ->withUserId($userId)
             ->withUserGroupIds([$userGroupId])
             ->withActive()
-            ->update(['masthead' => $masthead]);
+            ->update(['masthead' => $mastheadStatus->value]);
 
         $userGroup = UserGroup::find($userGroupId);
         self::forgetEditorialCache($userGroup->contextId);
-    }
-
-    /**
-     * Get UserUserGroup masthead status for a UserGroup the user is currently active in
-     *
-     */
-    public function getUserUserGroupMastheadStatus(int $userId, int $userGroupId): UserUserGroupMastheadStatus
-    {
-        $masthead = UserUserGroup::query()
-            ->withUserId($userId)
-            ->withUserGroupIds([$userGroupId])
-            ->withActive()
-            ->pluck('masthead')
-            ->first();
-
-        return match ($masthead) {
-            true => UserUserGroupMastheadStatus::STATUS_ON,
-            false => UserUserGroupMastheadStatus::STATUS_OFF,
-            default => UserUserGroupMastheadStatus::STATUS_NULL,
-        };
     }
 
     /**
@@ -330,13 +306,6 @@ class Repository
             return null;
         }
 
-        // Determine masthead status
-        $masthead = match ($mastheadStatus) {
-            UserUserGroupMastheadStatus::STATUS_ON => true,
-            UserUserGroupMastheadStatus::STATUS_OFF => false,
-            default => null,
-        };
-
         // Clear editorial masthead cache if a new user is assigned to a masthead role
         if ($userGroup->masthead) {
             self::forgetEditorialCache($userGroup->contextId);
@@ -347,7 +316,7 @@ class Repository
             'userGroupId' => $userGroupId,
             'dateStart' => $dateStart,
             'dateEnd' => $endDate,
-            'masthead' => $masthead,
+            'masthead' => $mastheadStatus ? $mastheadStatus->value : null,
         ]);
     }
 
@@ -600,7 +569,7 @@ class Repository
                 ->filterByContextIds([$contextId])
                 ->filterByUserGroupIds($mastheadRoleIds)
                 ->filterByUserUserGroupStatus($userUserGroupStatus)
-                ->filterByUserUserGroupMastheadStatus(UserUserGroupMastheadStatus::STATUS_ON)
+                ->filterByUserMastheadStatus(UserMastheadStatus::STATUS_ON)
                 ->orderBy(
                     $usersCollector::ORDERBY_FAMILYNAME,
                     $usersCollector::ORDER_DIR_ASC,

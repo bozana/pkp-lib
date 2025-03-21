@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use PKP\core\Core;
+use PKP\userGroup\relationships\enums\UserUserGroupMastheadStatus;
 use PKP\userGroup\UserGroup;
 
 class UserUserGroup extends \Illuminate\Database\Eloquent\Model
@@ -97,12 +98,12 @@ class UserUserGroup extends \Illuminate\Database\Eloquent\Model
 
     public function scopeWithMasthead(Builder $query): Builder
     {
-        return $query->where('user_user_groups.masthead', 1);
+        return $query->where('user_user_groups.masthead', UserUserGroupMastheadStatus::STATUS_ON);
     }
 
     public function scopeWithMastheadOff(Builder $query): Builder
     {
-        return $query->where('user_user_groups.masthead', 0);
+        return $query->where('user_user_groups.masthead', UserUserGroupMastheadStatus::STATUS_OFF);
     }
 
     public function scopeSortBy(Builder $query, string $column, ?string $direction = 'asc')

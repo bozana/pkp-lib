@@ -188,10 +188,7 @@ class UserForm extends Form
                         if (in_array($userGroupId, $reviewerUserGroupIds)) {
                             Repo::userGroup()->updateUserUserGroupMastheadStatus($this->userId, $userGroupId, UserUserGroupMastheadStatus::STATUS_ON);
                         } else {
-                            $masthead = match (in_array($userGroupId, $mastheadUserGroupIds)) {
-                                true => UserUserGroupMastheadStatus::STATUS_ON,
-                                false => UserUserGroupMastheadStatus::STATUS_OFF
-                            };
+                            $masthead = UserUserGroupMastheadStatus::from((int)in_array($userGroupId, $mastheadUserGroupIds));
                             Repo::userGroup()->updateUserUserGroupMastheadStatus($this->userId, $userGroupId, $masthead);
                         }
                     }
