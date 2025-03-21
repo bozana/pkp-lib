@@ -32,7 +32,6 @@ use PKP\facades\Locale;
 use PKP\identity\Identity;
 use PKP\plugins\Hook;
 use PKP\user\enums\UserMastheadStatus;
-use PKP\userGroup\relationships\enums\UserUserGroupMastheadStatus;
 use PKP\userGroup\relationships\enums\UserUserGroupStatus;
 
 /**
@@ -534,13 +533,13 @@ class Collector implements CollectorInterface
                 $this->userMastheadStatus === UserMastheadStatus::STATUS_ON,
                 fn (Builder $subQuery) =>
                     $subQuery->where('ug.masthead', 1)
-                        ->where('uug.masthead', UserUserGroupMastheadStatus::STATUS_ON)
+                        ->where('uug.masthead', 1)
             )
             ->when(
                 $this->userMastheadStatus === UserMastheadStatus::STATUS_OFF,
                 fn (Builder $subQuery) =>
                     $subQuery->where('ug.masthead', 0)
-                        ->orWhere('uug.masthead', UserUserGroupMastheadStatus::STATUS_OFF)
+                        ->orWhere('uug.masthead', 1)
                         ->orWhereNull('uug.masthead')
             );
 
@@ -619,12 +618,12 @@ class Collector implements CollectorInterface
                 ->when(
                     $this->userMastheadStatus === UserMastheadStatus::STATUS_ON,
                     fn (Builder $query) =>
-                        $query->where('uug.masthead', UserUserGroupMastheadStatus::STATUS_ON)
+                        $query->where('uug.masthead', 1)
                 )
                 ->when(
                     $this->userMastheadStatus === UserMastheadStatus::STATUS_OFF,
                     fn (Builder $query) =>
-                        $query->where('uug.masthead', UserUserGroupMastheadStatus::STATUS_OFF)
+                        $query->where('uug.masthead', 1)
                 )
         );
         return $this;

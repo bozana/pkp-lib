@@ -29,7 +29,6 @@ use PKP\security\Role;
 use PKP\services\PKPSchemaService;
 use PKP\site\SiteDAO;
 use PKP\user\enums\UserMastheadStatus;
-use PKP\userGroup\relationships\enums\UserUserGroupMastheadStatus;
 use PKP\userGroup\relationships\enums\UserUserGroupStatus;
 use PKP\userGroup\relationships\UserGroupStage;
 use PKP\userGroup\relationships\UserUserGroup;
@@ -258,13 +257,13 @@ class Repository
      * Update UserUserGroup masthead status for a UserGroup the user is currently active in
      *
      */
-    public function updateUserUserGroupMastheadStatus(int $userId, int $userGroupId, UserUserGroupMastheadStatus $mastheadStatus): void
+    public function updateUserUserGroupMasthead(int $userId, int $userGroupId, bool $masthead): void
     {
         UserUserGroup::query()
             ->withUserId($userId)
             ->withUserGroupIds([$userGroupId])
             ->withActive()
-            ->update(['masthead' => $mastheadStatus->value]);
+            ->update(['masthead' => $masthead]);
 
         $userGroup = UserGroup::find($userGroupId);
         self::forgetEditorialCache($userGroup->contextId);
@@ -293,7 +292,7 @@ class Repository
         int $userGroupId,
         ?string $startDate = null,
         ?string $endDate = null,
-        ?UserUserGroupMastheadStatus $mastheadStatus = null
+        ?bool $masthead = null
     ): ?UserUserGroup {
         if ($endDate && !Carbon::parse($endDate)->isFuture()) {
             return null;
@@ -316,7 +315,7 @@ class Repository
             'userGroupId' => $userGroupId,
             'dateStart' => $dateStart,
             'dateEnd' => $endDate,
-            'masthead' => $mastheadStatus ? $mastheadStatus->value : null,
+            'masthead' => $masthead,
         ]);
     }
 
