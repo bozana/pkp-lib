@@ -85,6 +85,7 @@ class OrcidJob extends BaseJob
         }
 
         $citation->setData('authors', $authorsChanged);
+        $citation->setIsProcessed(true);
         Repo::citation()->edit($citation, []);
     }
 }

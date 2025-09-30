@@ -42,7 +42,6 @@ class Citation extends DataObject
      */
     public function setRawCitation(string $rawCitation): void
     {
-        $rawCitation = $this->cleanCitationString($rawCitation);
         $this->setData('rawCitation', $rawCitation);
     }
 
@@ -90,22 +89,12 @@ class Citation extends DataObject
                 function ($matches) {
                     $trailingDot = in_array($char = substr($matches[0], -1), ['.', ',']);
                     $url = rtrim($matches[0], '.,');
-                    return "<a href='$url' target='_blank'>{$url}</a>" . ($trailingDot ? $char : '');
+                    return "<a href='{$url}' target='_blank'>{$url}</a>" . ($trailingDot ? $char : '');
                 },
                 $rawCitationWithLinks
             );
         }
         return $rawCitationWithLinks;
-    }
-
-    /**
-     * Take a citation string and clean/normalize it
-     */
-    public function cleanCitationString(string $citationString): string
-    {
-        $citationString = trim(stripslashes($citationString));
-        $newCitationString = preg_replace('/[\s]+/u', ' ', $citationString);
-        return empty($newCitationString) ? $citationString : $newCitationString;
     }
 
     /**
