@@ -24,7 +24,7 @@ class Doi extends BasePid
     /** @copydoc AbstractPid::regex */
     public const regexes = [
         // doi:10.1002/tox.20155 https://doi.org/10.1002/tox.20155
-        '/(?:doi:\s*|https?:\/\/doi\.org\/)10[.][0-9]{4,}\/[^\s"<>]+/i'
+        '/(?:doi:\s*|https?:\/\/(dx\.)*doi\.org\/)10[.][0-9]{4,}\/[^\s"<>]+/i'
     ];
 
     /** @copydoc AbstractPid::prefix */
@@ -39,6 +39,7 @@ class Doi extends BasePid
         'doi.org',
         'doi.org:',
         'dx.doi.org',
-        'dx.doi.org:'
+        'dx.doi.org:',
+        'https://dx.doi.org/',
     ];
 }

@@ -240,8 +240,12 @@ class Repository
                         $citation->setProcessingStatus(CitationProcessingStatus::NOT_PROCESSED->value);
                         $newCitationId = $this->dao->insert($citation);
                         $citation->setId($newCitationId);
-                        if ($citationsMetadataLookup && $reprocess) {
-                            $this->reprocessCitation($citation);
+                        if ($reprocess) {
+                            if ($citationsMetadataLookup) {
+                                $this->reprocessCitation($citation);
+                            } else {
+                                dispatch(new ExtractPidsJob($citation->getId()));
+                            }
                         }
                         $importedCitations[] = $citation;
                     }
@@ -290,6 +294,8 @@ class Repository
                         $citation->setId($newCitationId);
                         if ($this->request->getContext()->getData('citationsMetadataLookup')) {
                             $this->reprocessCitation($citation);
+                        } else {
+                            dispatch(new ExtractPidsJob($citation->getId()));
                         }
                     } else {
                         $rejectedCitations[] = $rawCitationString;
