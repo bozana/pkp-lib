@@ -9,7 +9,7 @@
  *
  * @class I8866_DispatchRegionCodesFixingJobs
  *
- * @brief Dispatches the jobs (a job per country) that shell fix the old region codes, if needed i.e. if any region exists.
+ * @brief Dispatches the jobs that fix the old region codes, if needed i.e. if any region exists.
  */
 
 namespace PKP\migration\upgrade\v3_4_0;
@@ -18,7 +18,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use PKP\core\Core;
 use PKP\install\DowngradeNotSupportedException;
 use PKP\migration\Migration;
 use PKP\migration\upgrade\v3_4_0\jobs\CleanTmpChangesForRegionCodesFixes;
@@ -44,11 +43,13 @@ class I8866_DispatchRegionCodesFixingJobs extends Migration
                 Schema::create('region_mapping_tmp', function (Blueprint $table) {
                     $table->string('country', 2);
                     $table->string('fips', 3);
-                    $table->string('iso', 3)->nullable();
+                    $table->string('pkp_fips', 7);
+                    $table->string('iso', 3);
+                    $table->index(['country', 'pkp_fips']);
                 });
             }
 
-            // temporary change the length of the region columns, becuase we will add prefix 'pkp-'
+            // temporary change the length of the region columns, because we will add prefix 'pkp-'
             Schema::table('metrics_submission_geo_daily', function (Blueprint $table) {
                 $table->string('region', 7)->change();
             });
@@ -77,35 +78,31 @@ class I8866_DispatchRegionCodesFixingJobs extends Migration
             $geoMonthlyIdMax = DB::table('metrics_submission_geo_monthly')
                 ->max('metrics_submission_geo_monthly_id');
 
-            $chunkSize = 100000;
+            $chunkSize = 10000;
             $geoDailyChunksNo = ceil($geoDailyIdMax / $chunkSize);
             $geoMonthlyChunksNo = ceil($geoMonthlyIdMax / $chunkSize);
 
-            // read the FIPS to ISO mappings and displatch a job per country
-            $mappings = include Core::getBaseDir() . '/' . PKP_LIB_PATH . '/lib/regionMapping.php';
-            $jobs = [];
-            foreach (array_keys($mappings) as $country) {
-                $jobs[] = new RegionMappingTmpInsert($country);
-                for ($i = 0; $i < $geoDailyChunksNo; $i++) {
-                    $startId = ($i * $chunkSize) + 1;
-                    $endId = min(($i + 1) * $chunkSize, $geoDailyIdMax);
-                    $jobs[] = new PreFixRegionCodesDaily($startId, $endId);
-                }
-                for ($i = 0; $i < $geoMonthlyChunksNo; $i++) {
-                    $startId = ($i * $chunkSize) + 1;
-                    $endId = min(($i + 1) * $chunkSize, $geoMonthlyIdMax);
-                    $jobs[] = new PreFixRegionCodesMonthly($startId, $endId);
-                }
-                for ($i = 0; $i < $geoDailyChunksNo; $i++) {
-                    $startId = ($i * $chunkSize) + 1;
-                    $endId = min(($i + 1) * $chunkSize, $geoDailyIdMax);
-                    $jobs[] = new FixRegionCodesDaily($startId, $endId);
-                }
-                for ($i = 0; $i < $geoMonthlyChunksNo; $i++) {
-                    $startId = ($i * $chunkSize) + 1;
-                    $endId = min(($i + 1) * $chunkSize, $geoMonthlyIdMax);
-                    $jobs[] = new FixRegionCodesMonthly($startId, $endId);
-                }
+            // load all FIPS-ISO mappings into the temporary table, then dispatch chunk jobs
+            $jobs = [new RegionMappingTmpInsert()];
+            for ($i = 0; $i < $geoDailyChunksNo; $i++) {
+                $startId = ($i * $chunkSize) + 1;
+                $endId = min(($i + 1) * $chunkSize, $geoDailyIdMax);
+                $jobs[] = new PreFixRegionCodesDaily($startId, $endId);
+            }
+            for ($i = 0; $i < $geoMonthlyChunksNo; $i++) {
+                $startId = ($i * $chunkSize) + 1;
+                $endId = min(($i + 1) * $chunkSize, $geoMonthlyIdMax);
+                $jobs[] = new PreFixRegionCodesMonthly($startId, $endId);
+            }
+            for ($i = 0; $i < $geoDailyChunksNo; $i++) {
+                $startId = ($i * $chunkSize) + 1;
+                $endId = min(($i + 1) * $chunkSize, $geoDailyIdMax);
+                $jobs[] = new FixRegionCodesDaily($startId, $endId);
+            }
+            for ($i = 0; $i < $geoMonthlyChunksNo; $i++) {
+                $startId = ($i * $chunkSize) + 1;
+                $endId = min(($i + 1) * $chunkSize, $geoMonthlyIdMax);
+                $jobs[] = new FixRegionCodesMonthly($startId, $endId);
             }
             $jobs[] = new CleanTmpChangesForRegionCodesFixes();
             Bus::chain($jobs)

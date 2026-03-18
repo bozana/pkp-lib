@@ -11,7 +11,7 @@
  *
  * @ingroup jobs
  *
- * @brief Loads the FIPS-ISO mapping for the given country to the temporary table.
+ * @brief Loads all FIPS-ISO mappings for all countries into the temporary table.
  */
 
 namespace PKP\migration\upgrade\v3_4_0\jobs;
@@ -23,37 +23,33 @@ use PKP\jobs\BaseJob;
 class RegionMappingTmpInsert extends BaseJob
 {
     /**
-     * Create a new job instance.
-     */
-    public function __construct(private string $country)
-    {
-        parent::__construct();
-    }
-
-    /**
      * Execute the job.
      */
     public function handle(): void
     {
-        // clear region_mapping_tmp table
-        DB::table('region_mapping_tmp')->delete();
+        // skip if already populated, i.e. the job is retried after a successful insert
+        if (DB::table('region_mapping_tmp')->exists()) {
+            return;
+        }
 
-        // read the FIPS to ISO mappings for the given country
+        // read all FIPS to ISO mappings
         $mappings = include Core::getBaseDir() . '/' . PKP_LIB_PATH . '/lib/regionMapping.php';
 
-        // build batch insert array for mappings where FIPS differs from ISO
+        // build batch insert array for all countries, only where FIPS differs from ISO
         $inserts = [];
-        foreach ($mappings[$this->country] as $fips => $iso) {
-            if ($fips !== $iso) {
-                $inserts[] = [
-                    'country' => $this->country,
-                    'fips' => $fips,
-                    'iso' => $iso
-                ];
+        foreach ($mappings as $country => $regions) {
+            foreach ($regions as $fips => $iso) {
+                if ($fips !== $iso) {
+                    $inserts[] = [
+                        'country' => $country,
+                        'fips' => $fips,
+                        'pkp_fips' => 'pkp-' . $fips,
+                        'iso' => $iso
+                    ];
+                }
             }
         }
 
-        // insert all mappings in one batch
         if (!empty($inserts)) {
             DB::table('region_mapping_tmp')->insert($inserts);
         }

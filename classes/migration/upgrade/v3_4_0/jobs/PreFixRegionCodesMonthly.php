@@ -11,8 +11,7 @@
  *
  * @ingroup jobs
  *
- * @brief Loads the FIPS-ISO mapping for the given country to the temporary table and fixes the wrong region codes, using the temporary table of FIPS-ISO mapping.
- * If it is the last job to run, it removes the temporary indexes and the temporary table.
+ * @brief Marks the wrong region codes, that will need to be fixed, with a prefix.
  */
 
 namespace PKP\migration\upgrade\v3_4_0\jobs;

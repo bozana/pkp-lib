@@ -39,7 +39,7 @@ class FixRegionCodesDaily extends BaseJob
         $query = DB::table('metrics_submission_geo_daily as gd')
             ->join('region_mapping_tmp as rm', function ($join) {
                 $join->on('gd.country', '=', 'rm.country')
-                    ->on('gd.region', '=', DB::raw("CONCAT('pkp-', rm.fips)"));
+                    ->on('gd.region', '=', 'rm.pkp_fips');
             })
             ->whereBetween('gd.metrics_submission_geo_daily_id', [$this->startId, $this->endId]);
 

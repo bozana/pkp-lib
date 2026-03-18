@@ -39,7 +39,7 @@ class FixRegionCodesMonthly extends BaseJob
         $query = DB::table('metrics_submission_geo_monthly as gm')
             ->join('region_mapping_tmp as rm', function ($join) {
                 $join->on('gm.country', '=', 'rm.country')
-                    ->on('gm.region', '=', DB::raw("CONCAT('pkp-', rm.fips)"));
+                    ->on('gm.region', '=', 'rm.pkp_fips');
             })
             ->whereBetween('gm.metrics_submission_geo_monthly_id', [$this->startId, $this->endId]);
 
