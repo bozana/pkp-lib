@@ -106,6 +106,11 @@ class UserUserGroup extends \Illuminate\Database\Eloquent\Model
         return $query->where('user_user_groups.masthead', 0);
     }
 
+    public function scopeWithUserUserGroupId(Builder $query, int $userUserGroupId): Builder
+    {
+        return $query->where('user_user_groups.user_user_group_id', $userUserGroupId);
+    }
+
     public function scopeSortBy(Builder $query, string $column, ?string $direction = 'asc')
     {
         return $query->orderBy('user_user_groups.' . $column, $direction);
