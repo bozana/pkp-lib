@@ -889,3 +889,9 @@ msgstr "Bio Statement"
 
 msgid "user.removeRole.roleRemainMessage"
 msgstr "You cannot remove the role. At least one role must be assigned to the user."
+
+msgid "user.masthead.update.title"
+msgstr "Update Masthead Visibility"
+
+msgid "user.masthead.update.message"
+msgstr "Are you sure you want to change this user's masthead visibility for this role?"
