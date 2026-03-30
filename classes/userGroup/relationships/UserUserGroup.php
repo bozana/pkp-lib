@@ -27,8 +27,7 @@ class UserUserGroup extends \Illuminate\Database\Eloquent\Model
     use HasCamelCasing;
 
     public $timestamps = false;
-    public $incrementing = false;
-    protected $primaryKey = null;
+    protected $primaryKey = 'user_user_group_id';
     protected $fillable = ['userGroupId', 'userId', 'dateStart', 'dateEnd', 'masthead'];
     protected $casts = [
         'dateStart' => 'datetime',

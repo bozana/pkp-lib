@@ -281,6 +281,7 @@ class Repository
         UserUserGroup::query()
             ->withUserUserGroupId($userUserGroup->userUserGroupId)
             ->update(['masthead' => $masthead]);
+        $userUserGroup->refresh();
 
         $userGroup = UserGroup::find($userUserGroup->userGroupId);
         if ($userGroup->masthead) {
