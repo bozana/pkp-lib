@@ -278,10 +278,7 @@ class Repository
      */
     public function setUserUserGroupMasthead(UserUserGroup $userUserGroup, bool $masthead): void
     {
-        UserUserGroup::query()
-            ->withUserUserGroupId($userUserGroup->userUserGroupId)
-            ->update(['masthead' => $masthead]);
-        $userUserGroup->refresh();
+        $userUserGroup->update(['masthead' => $masthead]);
 
         $userGroup = UserGroup::find($userUserGroup->userGroupId);
         if ($userGroup->masthead) {
