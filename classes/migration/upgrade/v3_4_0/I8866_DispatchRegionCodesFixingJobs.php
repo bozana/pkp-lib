@@ -3,8 +3,8 @@
 /**
  * @file classes/migration/upgrade/v3_4_0/I8866_DispatchRegionCodesFixingJobs.php
  *
- * Copyright (c) 2026 Simon Fraser University
- * Copyright (c) 2026 John Willinsky
+ * Copyright (c) 2022-2026 Simon Fraser University
+ * Copyright (c) 2022-2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
  * @class I8866_DispatchRegionCodesFixingJobs
@@ -20,13 +20,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use PKP\install\DowngradeNotSupportedException;
 use PKP\migration\Migration;
-use PKP\migration\upgrade\v3_4_0\jobs\CleanTmpChangesForRegionCodesFixes;
-use PKP\migration\upgrade\v3_4_0\jobs\FixRegionCodesDaily;
-use PKP\migration\upgrade\v3_4_0\jobs\FixRegionCodesMonthly;
-use PKP\migration\upgrade\v3_4_0\jobs\PreFixRegionCodesDaily;
-use PKP\migration\upgrade\v3_4_0\jobs\PreFixRegionCodesMonthly;
+use PKP\migration\upgrade\v3_4_0\jobs\FixRegionCodes;
 use PKP\migration\upgrade\v3_4_0\jobs\RegionMappingTmpInsert;
-use Throwable;
 
 class I8866_DispatchRegionCodesFixingJobs extends Migration
 {
@@ -35,82 +30,53 @@ class I8866_DispatchRegionCodesFixingJobs extends Migration
      */
     public function up(): void
     {
-        if (DB::table('metrics_submission_geo_monthly')->where('region', '<>', '')->exists() ||
-            DB::table('metrics_submission_geo_daily')->where('region', '<>', '')->exists()) {
+        if (!DB::table('metrics_submission_geo_monthly')->where('region', '<>', '')->exists() &&
+            !DB::table('metrics_submission_geo_daily')->where('region', '<>', '')->exists()) {
 
-            // create a temporary table for the FIPS-ISO mapping
-            if (!Schema::hasTable('region_mapping_tmp')) {
-                Schema::create('region_mapping_tmp', function (Blueprint $table) {
-                    $table->string('country', 2);
-                    $table->string('fips', 3);
-                    $table->string('pkp_fips', 7);
-                    $table->string('iso', 3);
-                    $table->index(['country', 'fips']);
-                    $table->index(['country', 'pkp_fips']);
-                });
-            }
-
-            // temporary change the length of the region columns, because we will add prefix 'pkp-'
-            Schema::table('metrics_submission_geo_daily', function (Blueprint $table) {
-                $table->string('region', 7)->change();
-            });
-            Schema::table('metrics_submission_geo_monthly', function (Blueprint $table) {
-                $table->string('region', 7)->change();
-            });
-
-            // temporarily add an index on (country, region) to speed up the region code updates
-            Schema::table('metrics_submission_geo_daily', function (Blueprint $table) {
-                if (!Schema::hasIndex('metrics_submission_geo_daily', 'metrics_submission_geo_daily_tmp_index')) {
-                    $table->index(['country', 'region'], 'metrics_submission_geo_daily_tmp_index');
-                }
-            });
-            Schema::table('metrics_submission_geo_monthly', function (Blueprint $table) {
-                if (!Schema::hasIndex('metrics_submission_geo_monthly', 'metrics_submission_geo_monthly_tmp_index')) {
-                    $table->index(['country', 'region'], 'metrics_submission_geo_monthly_tmp_index');
-                }
-            });
-
-            $geoDailyIdMax = DB::table('metrics_submission_geo_daily')
-                ->max('metrics_submission_geo_daily_id') ?? 0;
-            $geoMonthlyIdMax = DB::table('metrics_submission_geo_monthly')
-                ->max('metrics_submission_geo_monthly_id') ?? 0;
-
-            $chunkSize = 10000;
-            $geoDailyChunksNo = ceil($geoDailyIdMax / $chunkSize);
-            $geoMonthlyChunksNo = ceil($geoMonthlyIdMax / $chunkSize);
-
-            // load all FIPS-ISO mappings into the temporary table, then dispatch chunk jobs
-            $jobs = [new RegionMappingTmpInsert()];
-            for ($i = 0; $i < $geoDailyChunksNo; $i++) {
-                $startId = ($i * $chunkSize) + 1;
-                $endId = min(($i + 1) * $chunkSize, $geoDailyIdMax);
-                $jobs[] = new PreFixRegionCodesDaily($startId, $endId);
-            }
-            for ($i = 0; $i < $geoMonthlyChunksNo; $i++) {
-                $startId = ($i * $chunkSize) + 1;
-                $endId = min(($i + 1) * $chunkSize, $geoMonthlyIdMax);
-                $jobs[] = new PreFixRegionCodesMonthly($startId, $endId);
-            }
-            for ($i = 0; $i < $geoDailyChunksNo; $i++) {
-                $startId = ($i * $chunkSize) + 1;
-                $endId = min(($i + 1) * $chunkSize, $geoDailyIdMax);
-                $jobs[] = new FixRegionCodesDaily($startId, $endId);
-            }
-            for ($i = 0; $i < $geoMonthlyChunksNo; $i++) {
-                $startId = ($i * $chunkSize) + 1;
-                $endId = min(($i + 1) * $chunkSize, $geoMonthlyIdMax);
-                $jobs[] = new FixRegionCodesMonthly($startId, $endId);
-            }
-            $jobs[] = new CleanTmpChangesForRegionCodesFixes();
-            Bus::chain($jobs)
-                ->catch(function (Throwable $e) {
-                    // Temporary state (widened region columns, temp indexes, region_mapping_tmp table)
-                    // is intentionally left in place so failed jobs can be retried.
-                    // CleanTmpChangesForRegionCodesFixes will run once the chain completes successfully.
-                    error_log('Error during region codes fixing jobs: ' . $e->getMessage());
-                })
-                ->dispatch();
+            return;
         }
+
+        // create a temporary table for the FIPS-ISO mapping
+        if (!Schema::hasTable('region_mapping_tmp')) {
+            Schema::create('region_mapping_tmp', function (Blueprint $table) {
+                $table->string('country', 2);
+                $table->string('fips', 3);
+                $table->string('iso', 3);
+                $table->index(['country', 'fips']);
+            });
+        }
+
+        // add needs_review column: NULL marks existing records that need processing,
+        // default 0 ensures new records inserted during processing are excluded
+        foreach (['metrics_submission_geo_daily', 'metrics_submission_geo_monthly'] as $table) {
+            if (!Schema::hasColumn($table, 'needs_review')) {
+                Schema::table($table, function (Blueprint $t) {
+                    $t->smallInteger('needs_review')->nullable();
+                });
+                // Set the default separately rather than adding the column with a default value,
+                // to avoid a table rewrite in some databases (PostgreSQL < 11, MySQL 5.7).
+                // Laravel migration for updating column attributes results in
+                // ALTER TABLE ... CHANGE in some databases (MySQL 5.7), thus use a raw statement.
+                DB::statement("ALTER TABLE {$table} ALTER COLUMN needs_review SET DEFAULT 0");
+            }
+        }
+
+        // temporarily add an index on (country, region) to speed up the region code updates
+        Schema::table('metrics_submission_geo_daily', function (Blueprint $table) {
+            if (!Schema::hasIndex('metrics_submission_geo_daily', 'metrics_submission_geo_daily_tmp_index')) {
+                $table->index(['country', 'region'], 'metrics_submission_geo_daily_tmp_index');
+            }
+        });
+        Schema::table('metrics_submission_geo_monthly', function (Blueprint $table) {
+            if (!Schema::hasIndex('metrics_submission_geo_monthly', 'metrics_submission_geo_monthly_tmp_index')) {
+                $table->index(['country', 'region'], 'metrics_submission_geo_monthly_tmp_index');
+            }
+        });
+
+        Bus::chain([
+            new RegionMappingTmpInsert(),
+            new FixRegionCodes(),
+        ])->dispatch();
     }
 
     /**

@@ -42,7 +42,6 @@ class RegionMappingTmpInsert extends BaseJob
                     $inserts[] = [
                         'country' => $country,
                         'fips' => $fips,
-                        'pkp_fips' => 'pkp-' . $fips,
                         'iso' => $iso
                     ];
                 }
