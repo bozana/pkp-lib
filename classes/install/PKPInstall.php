@@ -259,6 +259,7 @@ class PKPInstall extends Installer
             'permitSettings' => true,
             'name' => $names,
             'namePlural' => $namePlurals,
+            'masthead' => 0,
         ]);
 
         // Save the UserGroup to the database
