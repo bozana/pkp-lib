@@ -18,7 +18,6 @@ namespace PKP\jobs\citation;
 
 use APP\facades\Repo;
 use PKP\citation\enum\CitationProcessingStatus;
-use PKP\job\exceptions\JobException;
 use PKP\jobs\BaseJob;
 
 class IsProcessedJob extends BaseJob
@@ -35,15 +34,13 @@ class IsProcessedJob extends BaseJob
 
     /**
      * Handle the queue job execution process
-     *
-     * @throws JobException
      */
     public function handle(): void
     {
         $citation = Repo::citation()->get($this->citationId);
 
         if (!$citation) {
-            throw new JobException(JobException::INVALID_PAYLOAD);
+            return;
         }
 
         $citation->setProcessingStatus(CitationProcessingStatus::PROCESSED->value);
